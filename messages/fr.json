@@ -1,0 +1,520 @@
+{
+  "Metadata": {
+    "title": "Young Caring | Ensemble, redonnons de l’espoir",
+    "description": "Young Caring agit pour améliorer durablement la vie des enfants, des jeunes et des familles vulnérables à travers des actions concrètes et transparentes."
+  },
+
+  "Common": {
+    "organizationName": "Young Caring",
+    "home": "Accueil",
+    "about": "À propos",
+    "actions": "Nos actions",
+    "campaigns": "Campagnes",
+    "transparency": "Dons & transparence",
+    "gallery": "Galerie",
+    "news": "Actualités",
+    "contact": "Contact",
+    "donate": "Faire un don",
+    "donateNow": "Faire un don maintenant",
+    "becomeVolunteer": "Devenir bénévole",
+    "becomePartner": "Devenir partenaire",
+    "learnMore": "En savoir plus",
+    "viewAll": "Voir tout",
+    "readMore": "Lire la suite",
+    "close": "Fermer",
+    "open": "Ouvrir",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "loading": "Chargement…",
+    "french": "Français",
+    "english": "Anglais",
+    "securePayment": "Paiement sécurisé",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "sort": "Trier",
+    "reset": "Réinitialiser",
+    "submit": "Envoyer",
+    "cancel": "Annuler",
+    "required": "Obligatoire",
+    "optional": "Facultatif",
+    "noResults": "Aucun résultat disponible",
+    "backHome": "Retour à l’accueil"
+  },
+
+  "Header": {
+    "navigationLabel": "Navigation principale",
+    "home": "Accueil",
+    "about": "À propos",
+    "actions": "Nos actions",
+    "transparency": "Dons & transparence",
+    "gallery": "Galerie",
+    "news": "Actualités",
+    "contact": "Contact",
+    "donate": "Faire un don",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "menuTitle": "Menu principal",
+    "languageSelector": "Changer la langue",
+    "switchToFrench": "Afficher le site en français",
+    "switchToEnglish": "Afficher le site en anglais"
+  },
+
+  "MobileNavigation": {
+    "navigationLabel": "Navigation mobile principale",
+    "home": "Accueil",
+    "actions": "Nos actions",
+    "donate": "Faire un don",
+    "news": "Actualités",
+    "contact": "Contact"
+  },
+
+  "Hero": {
+    "organizationLabel": "Young Caring",
+    "titleFirstLine": "Ensemble,",
+    "titleSecondLine": "redonnons",
+    "titleHighlight": "de l’espoir",
+    "description": "Young Caring agit chaque jour pour améliorer la vie des enfants, des jeunes et des familles vulnérables à travers des actions concrètes et durables.",
+    "donateButton": "Faire un don",
+    "discoverActionsButton": "Découvrir nos actions",
+    "imageAlt": "Des enfants accompagnés pendant une action humanitaire de Young Caring"
+  },
+
+  "Impact": {
+    "label": "Notre impact",
+    "peopleHelped": "Personnes aidées",
+    "projectsCompleted": "Projets réalisés",
+    "fundsDistributed": "FCFA distribués",
+    "communitiesReached": "Communautés touchées"
+  },
+
+  "About": {
+    "label": "Qui sommes-nous ?",
+    "titleStart": "Young Caring, une jeunesse engagée pour un",
+    "titleHighlight": "monde meilleur",
+    "description": "Nous croyons en un monde où chaque personne doit pouvoir accéder à l’éducation, à la santé, à la dignité et à l’espoir. Nous agissons auprès des enfants, des jeunes et des familles en situation de vulnérabilité.",
+    "button": "En savoir plus",
+    "imageAlt": "Un membre de Young Caring échangeant avec un enfant pendant une action de terrain"
+  },
+
+  "Actions": {
+    "label": "Nos actions",
+    "titleStart": "Agir aujourd’hui pour",
+    "titleHighlight": "changer demain",
+    "viewAll": "Voir toutes nos actions",
+    "learnMore": "En savoir plus",
+
+    "education": {
+      "title": "Éducation",
+      "description": "Soutien scolaire, fournitures et accompagnement éducatif des enfants.",
+      "imageAlt": "Action éducative organisée par Young Caring"
+    },
+
+    "foodAid": {
+      "title": "Aide alimentaire",
+      "description": "Distribution de vivres et de produits essentiels aux enfants et aux familles vulnérables.",
+      "imageAlt": "Distribution de dons organisée par Young Caring"
+    },
+
+    "health": {
+      "title": "Santé",
+      "description": "Actions de sensibilisation, de prévention et d’accompagnement liées à la santé.",
+      "imageAlt": "Action d’accompagnement organisée par Young Caring"
+    },
+
+    "clothingAndKits": {
+      "title": "Vêtements & kits",
+      "description": "Distribution de vêtements, de kits d’hygiène et d’autres produits essentiels.",
+      "imageAlt": "Vêtements et produits essentiels destinés aux bénéficiaires"
+    }
+  },
+
+  "Donation": {
+    "label": "Soutenez nos actions",
+    "titleStart": "Votre don",
+    "titleHighlight": "change des vies",
+    "description": "Chaque don, petit ou grand, nous permet d’agir concrètement sur le terrain et d’apporter de l’espoir là où il est le plus nécessaire.",
+    "amount5000": "5 000 FCFA",
+    "amount10000": "10 000 FCFA",
+    "amount25000": "25 000 FCFA",
+    "amount50000": "50 000 FCFA",
+    "amount100000": "100 000 FCFA",
+    "customAmount": "Autre montant",
+    "donateNow": "Faire un don maintenant",
+    "securePayment": "Paiement sécurisé"
+  },
+
+  "Newsletter": {
+    "label": "Restons connectés",
+    "title": "Inscrivez-vous à notre newsletter",
+    "description": "Recevez nos actualités et les résultats de nos actions directement dans votre boîte email.",
+    "emailLabel": "Votre adresse email",
+    "emailPlaceholder": "Votre adresse email",
+    "submit": "S’inscrire",
+    "submitting": "Inscription…",
+    "success": "Votre demande d’inscription a bien été préparée.",
+    "error": "Une erreur est survenue. Veuillez réessayer.",
+    "invalidEmail": "Veuillez saisir une adresse email valide."
+  },
+
+  "ActionsPage": {
+    "metadata": {
+      "title": "Nos actions | Young Caring",
+      "description": "Découvrez les actions officiellement publiées par Young Caring auprès des enfants, des familles et des communautés."
+    },
+
+    "hero": {
+      "label": "Nos actions",
+      "titleStart": "Agir aujourd’hui pour",
+      "titleHighlight": "changer demain.",
+      "description": "Chaque action de Young Caring contribue à améliorer durablement la vie des enfants, des jeunes, des familles et des communautés vulnérables.",
+      "discoverButton": "Découvrir nos actions",
+      "donateButton": "Faire un don",
+      "imageAlt": "Bénéficiaires et bénévoles réunis pendant une action de Young Caring"
+    },
+
+    "statistics": {
+      "sectionLabel": "Impact de nos actions",
+      "peopleHelped": "Personnes accompagnées",
+      "projectsCompleted": "Actions réalisées",
+      "communitiesReached": "Communautés soutenues",
+      "familiesHelped": "Familles accompagnées"
+    },
+
+    "categories": {
+      "sectionLabel": "Filtrer les actions par catégorie",
+      "all": "Toutes les actions",
+      "education": "Éducation",
+      "foodSupport": "Aide alimentaire",
+      "health": "Santé",
+      "clothing": "Vêtements et kits",
+      "children": "Enfance",
+      "womenFamilies": "Femmes et familles",
+      "waterHygiene": "Eau et hygiène",
+      "emergency": "Urgences"
+    },
+
+    "toolbar": {
+      "results": "{count} action(s) disponible(s)",
+      "searchLabel": "Rechercher une action",
+      "searchPlaceholder": "Rechercher une action...",
+      "sortLabel": "Trier les actions",
+      "newest": "Plus récentes",
+      "oldest": "Plus anciennes",
+      "titleAscending": "Titre de A à Z"
+    },
+
+    "list": {
+      "label": "Sur le terrain",
+      "titleStart": "Découvrez nos",
+      "titleHighlight": "actions concrètes",
+      "description": "Retrouvez les actions officiellement publiées par Young Caring et suivez notre engagement auprès des communautés."
+    },
+
+    "card": {
+      "viewAction": "Voir l’action",
+      "dateLabel": "Date",
+      "locationLabel": "Lieu",
+      "categoryLabel": "Catégorie"
+    },
+
+    "pagination": {
+      "navigationLabel": "Pagination des actions",
+      "previous": "Page précédente",
+      "next": "Page suivante",
+      "page": "Aller à la page {page}"
+    },
+
+    "empty": {
+      "title": "Aucune action disponible",
+      "description": "Aucune action officiellement publiée ne correspond actuellement à votre recherche.",
+      "clearFilters": "Réinitialiser les filtres"
+    },
+
+    "donation": {
+      "label": "Votre soutien compte",
+      "titleStart": "Vous aussi,",
+      "titleHighlight": "soutenez nos actions",
+      "description": "Chaque contribution aide Young Caring à poursuivre ses actions sur le terrain.",
+      "button": "Faire un don maintenant"
+    }
+  },
+
+  "AboutPage": {
+    "metadata": {
+      "title": "À propos | Young Caring",
+      "description": "Découvrez Young Caring, sa mission, sa vision, ses valeurs et son engagement."
+    },
+    "heroLabel": "À propos de Young Caring",
+    "heroTitle": "Une jeunesse engagée au service des communautés",
+    "heroDescription": "Nous agissons avec solidarité, responsabilité et transparence auprès des personnes vulnérables.",
+    "missionLabel": "Notre mission",
+    "missionTitle": "Agir concrètement et durablement",
+    "missionDescription": "Young Caring développe des actions adaptées aux besoins réels des enfants, des jeunes, des familles et des communautés.",
+    "visionLabel": "Notre vision",
+    "visionTitle": "Construire un avenir plus solidaire",
+    "visionDescription": "Nous voulons contribuer à un monde dans lequel chaque personne peut vivre avec dignité, espoir et davantage d’opportunités.",
+    "valuesLabel": "Nos valeurs",
+    "valuesTitle": "Les principes qui guident nos actions",
+    "solidarityTitle": "Solidarité",
+    "solidarityDescription": "Nous agissons aux côtés des personnes et des communautés.",
+    "respectTitle": "Respect",
+    "respectDescription": "Chaque personne est accueillie avec dignité et considération.",
+    "transparencyTitle": "Transparence",
+    "transparencyDescription": "Nous communiquons avec clarté sur nos actions et l’utilisation des ressources.",
+    "commitmentTitle": "Engagement",
+    "commitmentDescription": "Nous travaillons avec sérieux pour produire un impact durable.",
+    "teamLabel": "Notre équipe",
+    "teamTitle": "Des personnes engagées sur le terrain",
+    "teamDescription": "Notre équipe rassemble des bénévoles et des partenaires mobilisés autour de la mission de Young Caring.",
+    "ctaTitle": "Agissons ensemble",
+    "ctaDescription": "Rejoignez Young Caring comme bénévole, partenaire ou donateur.",
+    "ctaButton": "Nous rejoindre"
+  },
+
+  "DonationPage": {
+    "metadata": {
+      "title": "Faire un don | Young Caring",
+      "description": "Soutenez les actions de Young Caring grâce à une contribution responsable et transparente."
+    },
+    "heroLabel": "Faire un don",
+    "heroTitle": "Votre soutien permet d’agir",
+    "heroDescription": "Chaque contribution aide Young Caring à préparer et réaliser des actions utiles sur le terrain.",
+    "chooseAmount": "Choisissez un montant",
+    "customAmount": "Autre montant",
+    "amountLabel": "Montant du don",
+    "currency": "FCFA",
+    "minimumAmount": "Le montant minimum est de {amount} FCFA.",
+    "donorInformation": "Informations du donateur",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "email": "Adresse email",
+    "phone": "Téléphone",
+    "anonymousDonation": "Effectuer ce don anonymement",
+    "paymentMethod": "Moyen de paiement",
+    "noPaymentMethod": "Aucun moyen de paiement en ligne n’est actuellement disponible.",
+    "contactForDonation": "Contactez Young Caring pour organiser votre contribution.",
+    "continueButton": "Continuer",
+    "contactButton": "Contacter Young Caring",
+    "securityTitle": "Protection de vos informations",
+    "securityDescription": "Vos informations ne doivent être utilisées que pour le traitement et le suivi de votre don."
+  },
+
+  "TransparencyPage": {
+    "metadata": {
+      "title": "Dons et transparence | Young Caring",
+      "description": "Consultez les informations officielles publiées par Young Caring sur ses actions et l’utilisation des ressources."
+    },
+    "heroLabel": "Dons & transparence",
+    "heroTitle": "La transparence au cœur de nos actions",
+    "heroDescription": "Young Caring souhaite permettre à chaque donateur et partenaire de comprendre comment les ressources sont utilisées.",
+    "principlesLabel": "Nos engagements",
+    "principlesTitle": "Une gestion claire et responsable",
+    "traceabilityTitle": "Traçabilité",
+    "traceabilityDescription": "Les ressources reçues doivent être suivies et rattachées aux actions concernées.",
+    "accountabilityTitle": "Responsabilité",
+    "accountabilityDescription": "Chaque action doit faire l’objet d’un suivi adapté.",
+    "reportingTitle": "Rapports",
+    "reportingDescription": "Les rapports sont publiés uniquement lorsqu’ils sont disponibles et officiellement validés.",
+    "documentsTitle": "Documents et rapports",
+    "documentsDescription": "Retrouvez ici les documents officiellement publiés par Young Caring.",
+    "noDocuments": "Aucun document officiel n’est disponible pour le moment.",
+    "viewDocument": "Consulter le document",
+    "downloadDocument": "Télécharger le document",
+    "contactTitle": "Une question sur l’utilisation d’un don ?",
+    "contactDescription": "Contactez directement Young Caring pour obtenir des informations vérifiées.",
+    "contactButton": "Nous contacter"
+  },
+
+  "GalleryPage": {
+    "metadata": {
+      "title": "Galerie | Young Caring",
+      "description": "Découvrez en images les activités et les actions officiellement documentées par Young Caring."
+    },
+    "heroLabel": "Galerie",
+    "heroTitle": "Nos actions en images",
+    "heroDescription": "Découvrez les moments officiellement documentés pendant les activités de Young Caring.",
+    "all": "Toutes les photos",
+    "actions": "Actions",
+    "volunteers": "Bénévoles",
+    "beneficiaries": "Bénéficiaires",
+    "events": "Événements",
+    "openImage": "Ouvrir l’image",
+    "closeImage": "Fermer l’image",
+    "previousImage": "Image précédente",
+    "nextImage": "Image suivante",
+    "noImages": "Aucune image officielle n’est disponible dans cette catégorie."
+  },
+
+  "NewsPage": {
+    "metadata": {
+      "title": "Actualités | Young Caring",
+      "description": "Suivez les actualités, annonces et actions officiellement publiées par Young Caring."
+    },
+    "heroLabel": "Actualités",
+    "heroTitle": "Les nouvelles de Young Caring",
+    "heroDescription": "Retrouvez nos annonces, nos activités et les résultats officiellement publiés.",
+    "latestTitle": "Dernières actualités",
+    "featuredLabel": "À la une",
+    "readArticle": "Lire l’article",
+    "publishedOn": "Publié le {date}",
+    "searchLabel": "Rechercher une actualité",
+    "searchPlaceholder": "Rechercher une actualité...",
+    "allCategories": "Toutes les catégories",
+    "noNews": "Aucune actualité officielle n’est disponible pour le moment.",
+    "backToNews": "Retour aux actualités",
+    "shareArticle": "Partager cet article"
+  },
+
+  "ContactPage": {
+    "metadata": {
+      "title": "Contact | Young Caring",
+      "description": "Contactez Young Caring par téléphone, WhatsApp ou email."
+    },
+    "heroLabel": "Contact",
+    "heroTitle": "Parlons de votre demande",
+    "heroDescription": "Notre équipe est disponible pour répondre aux demandes concernant nos actions, les dons, le bénévolat et les partenariats.",
+    "informationTitle": "Nos coordonnées",
+    "phoneLabel": "Téléphone",
+    "whatsappLabel": "WhatsApp",
+    "emailLabel": "Adresse email",
+    "addressLabel": "Adresse",
+    "openMap": "Afficher sur la carte",
+    "formTitle": "Envoyez-nous un message",
+    "firstNameLabel": "Prénom",
+    "lastNameLabel": "Nom",
+    "emailInputLabel": "Adresse email",
+    "phoneInputLabel": "Téléphone",
+    "subjectLabel": "Objet de la demande",
+    "messageLabel": "Votre message",
+    "messagePlaceholder": "Expliquez clairement votre demande...",
+    "consentLabel": "J’accepte que mes informations soient utilisées pour répondre à cette demande.",
+    "sendButton": "Envoyer le message",
+    "sending": "Envoi…",
+    "success": "Votre message a bien été envoyé.",
+    "error": "Le message n’a pas pu être envoyé. Veuillez réessayer.",
+    "invalidEmail": "Veuillez saisir une adresse email valide.",
+    "requiredFields": "Veuillez remplir tous les champs obligatoires."
+  },
+
+  "VolunteerPage": {
+    "metadata": {
+      "title": "Devenir bénévole | Young Caring",
+      "description": "Rejoignez Young Caring et participez à des actions solidaires."
+    },
+    "heroLabel": "Bénévolat",
+    "heroTitle": "Mettez votre énergie au service des autres",
+    "heroDescription": "Rejoignez une communauté de personnes engagées dans des actions utiles et responsables.",
+    "whyJoinTitle": "Pourquoi devenir bénévole ?",
+    "whyJoinDescription": "Le bénévolat permet de partager ses compétences, son temps et son énergie au service des communautés.",
+    "formTitle": "Proposer ma candidature",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "email": "Adresse email",
+    "phone": "Téléphone",
+    "city": "Ville",
+    "availability": "Disponibilités",
+    "skills": "Compétences",
+    "motivation": "Motivation",
+    "consent": "J’accepte d’être contacté par Young Caring concernant ma demande de bénévolat.",
+    "submit": "Envoyer ma candidature",
+    "success": "Votre demande de bénévolat a bien été envoyée.",
+    "error": "Votre demande n’a pas pu être envoyée."
+  },
+
+  "PartnershipPage": {
+    "metadata": {
+      "title": "Devenir partenaire | Young Caring",
+      "description": "Construisez un partenariat responsable avec Young Caring."
+    },
+    "heroLabel": "Partenariat",
+    "heroTitle": "Construisons ensemble des actions durables",
+    "heroDescription": "Young Caring collabore avec des organisations qui partagent ses valeurs de solidarité, de responsabilité et de transparence.",
+    "typesTitle": "Comment collaborer avec nous ?",
+    "financialTitle": "Soutien financier",
+    "financialDescription": "Contribuer au financement d’une action officiellement définie.",
+    "materialTitle": "Soutien matériel",
+    "materialDescription": "Mettre à disposition des équipements ou des produits adaptés aux besoins.",
+    "skillsTitle": "Mécénat de compétences",
+    "skillsDescription": "Mobiliser des compétences professionnelles au service d’une action.",
+    "formTitle": "Proposer un partenariat",
+    "organization": "Nom de l’organisation",
+    "contactName": "Nom du responsable",
+    "email": "Adresse email",
+    "phone": "Téléphone",
+    "partnershipType": "Type de partenariat",
+    "message": "Présentation de votre proposition",
+    "consent": "J’accepte d’être contacté par Young Caring concernant cette proposition.",
+    "submit": "Envoyer la proposition",
+    "success": "Votre proposition a bien été envoyée.",
+    "error": "Votre proposition n’a pas pu être envoyée."
+  },
+
+  "LegalPages": {
+    "legalNoticeTitle": "Mentions légales",
+    "privacyPolicyTitle": "Politique de confidentialité",
+    "donationTermsTitle": "Conditions de don",
+    "lastUpdated": "Dernière mise à jour : {date}",
+    "publisherTitle": "Éditeur du site",
+    "hostingTitle": "Hébergement",
+    "dataProtectionTitle": "Protection des données",
+    "collectedDataTitle": "Données collectées",
+    "dataUseTitle": "Utilisation des données",
+    "dataRetentionTitle": "Durée de conservation",
+    "userRightsTitle": "Vos droits",
+    "cookiesTitle": "Cookies",
+    "contactTitle": "Contact",
+    "contentPending": "Les informations juridiques officielles doivent être complétées et validées avant la publication du site."
+  },
+
+  "Footer": {
+    "description": "Young Caring agit pour construire un avenir plus juste, plus solidaire et plus humain.",
+    "quickLinksTitle": "Liens rapides",
+    "actionsTitle": "Nos actions",
+    "contactTitle": "Besoin d’aide ?",
+    "paymentsTitle": "Paiement sécurisé",
+    "followUsTitle": "Suivez-nous",
+    "home": "Accueil",
+    "about": "À propos",
+    "actions": "Nos actions",
+    "campaigns": "Campagnes",
+    "transparency": "Dons & transparence",
+    "gallery": "Galerie",
+    "news": "Actualités",
+    "contact": "Contact",
+    "education": "Éducation",
+    "foodAid": "Aide alimentaire",
+    "health": "Santé",
+    "clothingAndKits": "Vêtements & kits",
+    "socialSupport": "Soutien social",
+    "phoneLabel": "Téléphone",
+    "whatsappLabel": "WhatsApp",
+    "emailLabel": "Adresse email",
+    "addressLabel": "Adresse",
+    "facebookLabel": "Suivre Young Caring sur Facebook",
+    "instagramLabel": "Suivre Young Caring sur Instagram",
+    "tiktokLabel": "Suivre Young Caring sur TikTok",
+    "youtubeLabel": "Suivre Young Caring sur YouTube",
+    "linkedinLabel": "Suivre Young Caring sur LinkedIn",
+    "legalNotice": "Mentions légales",
+    "privacyPolicy": "Politique de confidentialité",
+    "donationTerms": "Conditions de don",
+    "copyright": "© {year} Young Caring. Tous droits réservés."
+  },
+
+  "Accessibility": {
+    "skipToContent": "Aller au contenu principal",
+    "logoAlt": "Logo officiel de Young Caring",
+    "currentPage": "Page actuelle",
+    "externalLink": "Ce lien s’ouvre dans un nouvel onglet",
+    "scrollToTop": "Retourner en haut de la page"
+  },
+
+  "Errors": {
+    "pageNotFoundTitle": "Page introuvable",
+    "pageNotFoundDescription": "La page que vous recherchez n’existe pas ou a été déplacée.",
+    "backHome": "Retour à l’accueil",
+    "generalTitle": "Une erreur est survenue",
+    "generalDescription": "Nous ne pouvons pas afficher cette page pour le moment.",
+    "tryAgain": "Réessayer"
+  }
+}
