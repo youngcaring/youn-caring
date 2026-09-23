@@ -372,68 +372,64 @@ function checkRateLimit(
  * public Young Caring, y compris pendant les
  * tests locaux.
  */
-function getConfiguredSiteUrl():
-  URL | null {
-  const configuredUrl =
-    process.env
-      .NEXT_PUBLIC_SITE_URL
-      ?.trim();
+const OFFICIAL_PRODUCTION_SITE_URL =
+  "https://young-caring.org";
 
-  if (!configuredUrl) {
-    return null;
+function getConfiguredSiteUrl(): URL | null {
+  const isProduction =
+    process.env.NODE_ENV === "production";
+
+  const fallbackUrl = isProduction
+    ? OFFICIAL_PRODUCTION_SITE_URL
+    : "http://localhost:3000";
+
+  const candidates = [
+    process.env.SITE_URL?.trim(),
+    process.env.NEXT_PUBLIC_SITE_URL?.trim(),
+    fallbackUrl,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      const siteUrl = new URL(candidate);
+
+      const protocolIsAllowed =
+        siteUrl.protocol === "https:" ||
+        (
+          !isProduction &&
+          siteUrl.protocol === "http:"
+        );
+
+      if (
+        !protocolIsAllowed ||
+        siteUrl.username.length > 0 ||
+        siteUrl.password.length > 0 ||
+        siteUrl.search.length > 0 ||
+        siteUrl.hash.length > 0
+      ) {
+        continue;
+      }
+
+      if (
+        siteUrl.pathname !== "/" &&
+        siteUrl.pathname !== ""
+      ) {
+        continue;
+      }
+
+      siteUrl.pathname = "/";
+
+      return siteUrl;
+    } catch {
+      continue;
+    }
   }
 
-  try {
-    const siteUrl =
-      new URL(
-        configuredUrl
-      );
-
-    const isProduction =
-      process.env.NODE_ENV ===
-      "production";
-
-    const protocolIsAllowed =
-      siteUrl.protocol ===
-        "https:" ||
-      (
-        !isProduction &&
-        siteUrl.protocol ===
-          "http:"
-      );
-
-    if (
-      !protocolIsAllowed ||
-      siteUrl.username.length > 0 ||
-      siteUrl.password.length > 0
-    ) {
-      return null;
-    }
-
-    if (
-      siteUrl.search.length > 0 ||
-      siteUrl.hash.length > 0
-    ) {
-      return null;
-    }
-
-    /**
-     * L’adresse configurée doit représenter
-     * uniquement l’origine du site.
-     */
-    if (
-      siteUrl.pathname !== "/" &&
-      siteUrl.pathname !== ""
-    ) {
-      return null;
-    }
-
-    siteUrl.pathname = "/";
-
-    return siteUrl;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /**
