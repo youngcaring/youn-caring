@@ -1,8 +1,11 @@
+import "server-only";
+
 import {
   getDonationLimits,
   isDonationAllocationId,
   isDonationCurrency,
 } from "@/data/donation";
+
 import type {
   DonationCheckoutRequest,
   DonationFieldErrors,
@@ -11,20 +14,43 @@ import type {
   ValidatedDonationCheckout,
 } from "@/types/donation";
 
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * VALIDATION SERVEUR DES DONS
+ * ============================================================================
+ *
+ * Ce fichier :
+ *
+ * - considère toutes les données reçues comme inconnues ;
+ * - nettoie les textes ;
+ * - valide le donateur ;
+ * - valide le montant selon la devise ;
+ * - valide la fréquence et le domaine soutenu ;
+ * - exige le consentement ;
+ * - ne traite aucune donnée bancaire ;
+ * - retourne uniquement des données sûres et typées.
+ *
+ * Cette validation doit être exécutée côté serveur,
+ * même si le formulaire possède déjà une validation
+ * côté navigateur.
+ * ============================================================================
+ */
+
 const EMAIL_PATTERN =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const PHONE_PATTERN =
-  /^[0-9+\s().-]+$/;
+  /^\+?[0-9\s().-]+$/;
 
 const CONTROL_CHARACTERS_PATTERN =
   /[\u0000-\u001F\u007F]/g;
 
 const VALID_FREQUENCIES:
   readonly DonationFrequency[] = [
-  "once",
-  "monthly",
-];
+    "once",
+    "monthly",
+  ];
 
 const MAX_FIRST_NAME_LENGTH = 60;
 const MAX_LAST_NAME_LENGTH = 60;
@@ -40,6 +66,10 @@ type MutableDonationFieldErrors =
     >
   >;
 
+/**
+ * Vérifie qu’une valeur inconnue est
+ * un objet non nul et non-tableau.
+ */
 function isRecord(
   value: unknown
 ): value is Record<string, unknown> {
@@ -50,33 +80,62 @@ function isRecord(
   );
 }
 
+/**
+ * Nettoie une valeur textuelle sans
+ * la tronquer silencieusement.
+ *
+ * La longueur est vérifiée séparément afin
+ * de pouvoir retourner une véritable erreur.
+ */
 function normalizeText(
-  value: unknown,
-  maximumLength: number
+  value: unknown
 ): string {
   if (typeof value !== "string") {
     return "";
   }
 
   return value
+    .normalize("NFKC")
     .replace(
       CONTROL_CHARACTERS_PATTERN,
-      ""
+      " "
     )
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maximumLength);
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim();
 }
 
+/**
+ * Nettoie et normalise une adresse e-mail.
+ */
 function normalizeEmail(
   value: unknown
 ): string {
   return normalizeText(
-    value,
-    MAX_EMAIL_LENGTH
+    value
   ).toLowerCase();
 }
 
+/**
+ * Vérifie qu’un texte respecte une longueur
+ * minimale et maximale.
+ */
+function isValidTextLength(
+  value: string,
+  minimumLength: number,
+  maximumLength: number
+): boolean {
+  return (
+    value.length >= minimumLength &&
+    value.length <= maximumLength
+  );
+}
+
+/**
+ * Analyse une fréquence de don.
+ */
 function parseDonationFrequency(
   value: unknown
 ): DonationFrequency | null {
@@ -97,6 +156,11 @@ function parseDonationFrequency(
   return value as DonationFrequency;
 }
 
+/**
+ * Analyse un montant.
+ *
+ * Les montants doivent être des entiers sûrs.
+ */
 function parseDonationAmount(
   value: unknown
 ): number | null {
@@ -110,6 +174,12 @@ function parseDonationAmount(
   return value;
 }
 
+/**
+ * Vérifie un numéro de téléphone optionnel.
+ *
+ * Le signe + est autorisé uniquement au début
+ * et une seule fois.
+ */
 function isValidOptionalPhone(
   phone: string
 ): boolean {
@@ -117,12 +187,40 @@ function isValidOptionalPhone(
     return true;
   }
 
-  if (!PHONE_PATTERN.test(phone)) {
+  if (
+    phone.length >
+    MAX_PHONE_LENGTH
+  ) {
+    return false;
+  }
+
+  if (
+    !PHONE_PATTERN.test(phone)
+  ) {
+    return false;
+  }
+
+  const plusCount =
+    (
+      phone.match(/\+/g) ??
+      []
+    ).length;
+
+  if (
+    plusCount > 1 ||
+    (
+      plusCount === 1 &&
+      !phone.startsWith("+")
+    )
+  ) {
     return false;
   }
 
   const digits =
-    phone.replace(/\D/g, "");
+    phone.replace(
+      /\D/g,
+      ""
+    );
 
   return (
     digits.length >= 6 &&
@@ -130,12 +228,12 @@ function isValidOptionalPhone(
   );
 }
 
-/*
+/**
  * Valide complètement les données reçues
- * par la route de paiement.
+ * par la route de création du paiement.
  *
  * Toutes les valeurs provenant du navigateur
- * sont considérées comme inconnues avant validation.
+ * sont considérées comme inconnues.
  */
 export function validateDonationCheckout(
   input: unknown
@@ -154,7 +252,8 @@ export function validateDonationCheckout(
     };
   }
 
-  const donorValue = input.donor;
+  const donorValue =
+    input.donor;
 
   if (!isRecord(donorValue)) {
     return {
@@ -167,34 +266,34 @@ export function validateDonationCheckout(
     };
   }
 
-  const firstName = normalizeText(
-    donorValue.firstName,
-    MAX_FIRST_NAME_LENGTH
-  );
+  const firstName =
+    normalizeText(
+      donorValue.firstName
+    );
 
-  const lastName = normalizeText(
-    donorValue.lastName,
-    MAX_LAST_NAME_LENGTH
-  );
+  const lastName =
+    normalizeText(
+      donorValue.lastName
+    );
 
-  const email = normalizeEmail(
-    donorValue.email
-  );
+  const email =
+    normalizeEmail(
+      donorValue.email
+    );
 
-  const phone = normalizeText(
-    donorValue.phone,
-    MAX_PHONE_LENGTH
-  );
+  const phone =
+    normalizeText(
+      donorValue.phone
+    );
 
-  const country = normalizeText(
-    donorValue.country,
-    MAX_COUNTRY_LENGTH
-  );
+  const country =
+    normalizeText(
+      donorValue.country
+    );
 
-  /*
-   * Chaque valeur inconnue devient :
-   * - une valeur correctement typée ;
-   * - ou null lorsqu’elle est invalide.
+  /**
+   * Chaque valeur inconnue devient soit une
+   * valeur correctement typée, soit null.
    */
   const frequency =
     parseDonationFrequency(
@@ -226,34 +325,74 @@ export function validateDonationCheckout(
       ? donorValue.anonymous
       : null;
 
-  /*
-   * Validation des informations personnelles.
+  /**
+   * Validation du prénom.
    */
-  if (firstName.length < 2) {
+  if (
+    !isValidTextLength(
+      firstName,
+      2,
+      MAX_FIRST_NAME_LENGTH
+    )
+  ) {
     errors.firstName =
-      "Le prénom est obligatoire.";
+      firstName.length === 0
+        ? "Le prénom est obligatoire."
+        : `Le prénom doit contenir entre 2 et ${MAX_FIRST_NAME_LENGTH} caractères.`;
   }
 
-  if (lastName.length < 2) {
+  /**
+   * Validation du nom.
+   */
+  if (
+    !isValidTextLength(
+      lastName,
+      2,
+      MAX_LAST_NAME_LENGTH
+    )
+  ) {
     errors.lastName =
-      "Le nom est obligatoire.";
+      lastName.length === 0
+        ? "Le nom est obligatoire."
+        : `Le nom doit contenir entre 2 et ${MAX_LAST_NAME_LENGTH} caractères.`;
   }
 
+  /**
+   * Validation de l’adresse e-mail.
+   */
   if (
     email.length === 0 ||
     email.length > MAX_EMAIL_LENGTH ||
     !EMAIL_PATTERN.test(email)
   ) {
     errors.email =
-      "L’adresse email est invalide.";
+      "L’adresse e-mail est invalide.";
   }
 
-  if (!isValidOptionalPhone(phone)) {
+  /**
+   * Validation du téléphone optionnel.
+   */
+  if (
+    !isValidOptionalPhone(
+      phone
+    )
+  ) {
     errors.phone =
       "Le numéro de téléphone est invalide.";
   }
 
-  /*
+  /**
+   * Validation du pays optionnel.
+   */
+  if (
+    country.length >
+    MAX_COUNTRY_LENGTH
+  ) {
+    errors.country =
+      `Le pays ne doit pas dépasser ${MAX_COUNTRY_LENGTH} caractères.`;
+  }
+
+  /**
    * Validation de la fréquence.
    */
   if (frequency === null) {
@@ -261,7 +400,7 @@ export function validateDonationCheckout(
       "La fréquence du don est invalide.";
   }
 
-  /*
+  /**
    * Validation de la devise.
    */
   if (currency === null) {
@@ -269,19 +408,17 @@ export function validateDonationCheckout(
       "La devise sélectionnée est invalide.";
   }
 
-  /*
+  /**
    * Validation du montant.
-   *
-   * TypeScript sait ici que currency est une
-   * DonationCurrency et que amount est un nombre
-   * lorsque les deux valeurs ne sont pas null.
    */
   if (amount === null) {
     errors.amount =
       "Le montant du don est invalide.";
   } else if (currency !== null) {
     const limits =
-      getDonationLimits(currency);
+      getDonationLimits(
+        currency
+      );
 
     if (
       amount < limits.minimum ||
@@ -296,7 +433,7 @@ export function validateDonationCheckout(
     }
   }
 
-  /*
+  /**
    * Validation du domaine soutenu.
    */
   if (allocation === null) {
@@ -304,15 +441,17 @@ export function validateDonationCheckout(
       "Le domaine sélectionné est invalide.";
   }
 
-  /*
+  /**
    * Validation du consentement.
    */
-  if (donorValue.consent !== true) {
+  if (
+    donorValue.consent !== true
+  ) {
     errors.consent =
       "Le consentement est obligatoire.";
   }
 
-  /*
+  /**
    * Validation du choix d’anonymat.
    */
   if (anonymous === null) {
@@ -330,14 +469,9 @@ export function validateDonationCheckout(
     };
   }
 
-  /*
-   * Cette vérification explicite permet également
-   * à TypeScript de garantir tous les types utilisés
-   * pour construire les données validées.
-   *
-   * Elle constitue une sécurité supplémentaire,
-   * même si les erreurs précédentes ont déjà été
-   * contrôlées.
+  /**
+   * Cette vérification finale garantit les types
+   * utilisés pour construire le résultat validé.
    */
   if (
     frequency === null ||
@@ -390,11 +524,13 @@ export function validateDonationCheckout(
   };
 }
 
-/*
- * Version destinée aux appels internes déjà typés.
+/**
+ * Version destinée aux appels internes
+ * déjà typés.
  *
- * La validation complète reste exécutée pour ne jamais
- * faire confiance uniquement aux types TypeScript.
+ * La validation complète reste exécutée afin
+ * de ne jamais faire confiance uniquement aux
+ * types TypeScript.
  */
 export function validateTypedDonationCheckout(
   input: DonationCheckoutRequest

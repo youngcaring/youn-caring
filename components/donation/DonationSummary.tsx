@@ -2,13 +2,18 @@
 
 import {
   BadgeCheck,
+  CreditCard,
   Heart,
+  Info,
   LoaderCircle,
-  ShieldCheck,
+  Smartphone,
   WalletCards,
 } from "lucide-react";
 
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import {
+  useLanguage,
+} from "@/components/providers/LanguageProvider";
+
 import {
   formatDonationAmount,
   getDonationAllocationLabel,
@@ -16,37 +21,119 @@ import {
   getDonationCurrencySymbol,
   getDonationLimits,
 } from "@/data/donation";
+
 import type {
   DonationAllocationId,
   DonationCurrency,
   DonationFrequency,
+  DonationPaymentMethod,
 } from "@/types/donation";
 
-type DonationSummaryProps = Readonly<{
-  frequency: DonationFrequency;
-  amount: number;
-  currency: DonationCurrency;
-  allocation: DonationAllocationId;
-  submitting: boolean;
-}>;
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * RÉCAPITULATIF DU DON
+ * ============================================================================
+ *
+ * Ce composant :
+ *
+ * - affiche le montant sélectionné ;
+ * - affiche la fréquence du don ;
+ * - affiche la devise ;
+ * - affiche le domaine soutenu ;
+ * - affiche le moyen de paiement choisi ;
+ * - empêche l’envoi lorsque les données essentielles sont incomplètes ;
+ * - ne collecte aucune donnée bancaire ;
+ * - soumet le formulaire principal grâce à son identifiant HTML.
+ *
+ * La validation affichée ici améliore l’expérience utilisateur.
+ * La validation définitive reste toujours effectuée côté serveur.
+ * ============================================================================
+ */
+
+export type DonationSummaryProps =
+  Readonly<{
+    frequency:
+      DonationFrequency;
+
+    amount:
+      number;
+
+    currency:
+      DonationCurrency;
+
+    allocation:
+      DonationAllocationId;
+
+    paymentMethod:
+      DonationPaymentMethod | null;
+
+    submitting:
+      boolean;
+  }>;
+
+/**
+ * Retourne le libellé du moyen de paiement.
+ */
+function getPaymentMethodLabel(
+  paymentMethod:
+    DonationPaymentMethod | null,
+  isFrench: boolean
+): string {
+  switch (paymentMethod) {
+    case "mobile_money":
+      return "Mobile Money";
+
+    case "card":
+      return isFrench
+        ? "Carte bancaire"
+        : "Bank card";
+
+    default:
+      return isFrench
+        ? "Non sélectionné"
+        : "Not selected";
+  }
+}
 
 export default function DonationSummary({
   frequency,
   amount,
   currency,
   allocation,
+  paymentMethod,
   submitting,
 }: DonationSummaryProps) {
-  const { language } = useLanguage();
-  const isFrench = language === "fr";
+  const { language } =
+    useLanguage();
+
+  const isFrench =
+    language === "fr";
 
   const limits =
-    getDonationLimits(currency);
+    getDonationLimits(
+      currency
+    );
 
   const validAmount =
-    Number.isSafeInteger(amount) &&
-    amount >= limits.minimum &&
-    amount <= limits.maximum;
+    Number.isSafeInteger(
+      amount
+    ) &&
+    amount >=
+      limits.minimum &&
+    amount <=
+      limits.maximum;
+
+  const paymentMethodIsValid =
+    paymentMethod ===
+      "mobile_money" ||
+    paymentMethod ===
+      "card";
+
+  const canSubmit =
+    validAmount &&
+    paymentMethodIsValid &&
+    !submitting;
 
   const formattedAmount =
     formatDonationAmount(
@@ -72,6 +159,12 @@ export default function DonationSummary({
       language
     );
 
+  const paymentMethodLabel =
+    getPaymentMethodLabel(
+      paymentMethod,
+      isFrench
+    );
+
   const frequencyLabel =
     frequency === "monthly"
       ? isFrench
@@ -80,6 +173,17 @@ export default function DonationSummary({
       : isFrench
         ? "Ponctuel"
         : "One-time";
+
+  const validationMessage =
+    !validAmount
+      ? isFrench
+        ? "Sélectionnez un montant valide pour continuer."
+        : "Select a valid amount to continue."
+      : !paymentMethodIsValid
+        ? isFrench
+          ? "Sélectionnez un moyen de paiement pour continuer."
+          : "Select a payment method to continue."
+        : null;
 
   return (
     <aside
@@ -255,16 +359,64 @@ export default function DonationSummary({
               {allocationLabel || "—"}
             </dd>
           </div>
+
+          <div className="flex items-center justify-between gap-4 py-4">
+            <dt className="text-sm text-white/65">
+              {isFrench
+                ? "Moyen de paiement"
+                : "Payment method"}
+            </dt>
+
+            <dd
+              className={[
+                "flex max-w-[65%]",
+                "items-center justify-end",
+                "gap-2 text-right",
+                "text-sm font-extrabold",
+                paymentMethodIsValid
+                  ? "text-white"
+                  : "text-[#ffc59f]",
+              ].join(" ")}
+            >
+              {paymentMethod ===
+              "mobile_money" ? (
+                <Smartphone
+                  aria-hidden="true"
+                  size={17}
+                  className="shrink-0 text-[#42d1dc]"
+                />
+              ) : paymentMethod ===
+                "card" ? (
+                <CreditCard
+                  aria-hidden="true"
+                  size={17}
+                  className="shrink-0 text-[#42d1dc]"
+                />
+              ) : (
+                <WalletCards
+                  aria-hidden="true"
+                  size={17}
+                  className="shrink-0"
+                />
+              )}
+
+              <span>
+                {paymentMethodLabel}
+              </span>
+            </dd>
+          </div>
         </dl>
 
         <button
           type="submit"
           form="donation-form"
-          disabled={
-            submitting ||
-            !validAmount
-          }
+          disabled={!canSubmit}
           aria-busy={submitting}
+          aria-describedby={
+            validationMessage
+              ? "donation-summary-validation"
+              : undefined
+          }
           className={[
             "group relative isolate",
             "mt-6 inline-flex",
@@ -293,19 +445,18 @@ export default function DonationSummary({
             "motion-reduce:transition-none",
           ].join(" ")}
         >
-          {!submitting &&
-            validAmount && (
-              <span
-                aria-hidden="true"
-                className={[
-                  "absolute inset-0 -z-10",
-                  "rounded-full",
-                  "bg-[#ff8a3d]/35",
-                  "animate-pulse",
-                  "motion-reduce:animate-none",
-                ].join(" ")}
-              />
-            )}
+          {canSubmit ? (
+            <span
+              aria-hidden="true"
+              className={[
+                "absolute inset-0 -z-10",
+                "rounded-full",
+                "bg-[#ff8a3d]/35",
+                "animate-pulse",
+                "motion-reduce:animate-none",
+              ].join(" ")}
+            />
+          ) : null}
 
           {submitting ? (
             <LoaderCircle
@@ -336,16 +487,16 @@ export default function DonationSummary({
           </span>
         </button>
 
-        {!validAmount && (
+        {validationMessage ? (
           <p
+            id="donation-summary-validation"
             role="status"
+            aria-live="polite"
             className="mt-3 text-center text-xs font-bold text-[#ffc59f]"
           >
-            {isFrench
-              ? "Sélectionnez un montant valide pour continuer."
-              : "Select a valid amount to continue."}
+            {validationMessage}
           </p>
-        )}
+        ) : null}
 
         <div
           className={[
@@ -357,7 +508,7 @@ export default function DonationSummary({
             "leading-5 text-white/65",
           ].join(" ")}
         >
-          <ShieldCheck
+          <Info
             aria-hidden="true"
             size={17}
             className="mt-0.5 shrink-0 text-[#42d1dc]"
@@ -365,8 +516,8 @@ export default function DonationSummary({
 
           <p>
             {isFrench
-              ? "Les informations bancaires seront saisies uniquement sur la page sécurisée du prestataire de paiement."
-              : "Banking information will only be entered on the payment provider’s secure page."}
+              ? "Les informations bancaires seront renseignées directement sur la page du prestataire de paiement. Young Caring ne collecte pas ces informations."
+              : "Banking information will be entered directly on the payment provider’s page. Young Caring does not collect this information."}
           </p>
         </div>
 
@@ -379,8 +530,8 @@ export default function DonationSummary({
 
           <span>
             {isFrench
-              ? "Montant et devise vérifiés côté serveur"
-              : "Amount and currency verified by the server"}
+              ? "Montant et devise contrôlés côté serveur"
+              : "Amount and currency checked by the server"}
           </span>
         </div>
       </div>

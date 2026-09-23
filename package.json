@@ -11,11 +11,16 @@
     "check": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.1.0",
+    "@react-pdf/renderer": "^4.9.0",
+    "dotenv": "^18.0.3",
     "lucide-react": "^1.45.0",
     "next": "16.3.4",
     "next-intl": "^4.14.3",
+    "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.28.0",
@@ -24,10 +29,12 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

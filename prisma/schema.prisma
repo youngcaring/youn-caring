@@ -1,0 +1,501 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * SCHÉMA PRISMA — DONS, PAIEMENTS, WEBHOOKS ET REÇUS
+ * ============================================================================
+ * Ce schéma prend en charge :
+ * - l’enregistrement sécurisé des dons ;
+ * - la création des paiements Moneroo ;
+ * - la vérification serveur des paiements ;
+ * - le traitement idempotent des webhooks ;
+ * - la génération des reçus PDF ;
+ * - l’envoi des reçus par e-mail ;
+ * - le suivi des erreurs de génération et d’envoi.
+ * Ce schéma ne conserve jamais :
+ * - les numéros de carte bancaire ;
+ * - les codes CVV ;
+ * - les codes PIN Mobile Money ;
+ * - les mots de passe de paiement ;
+ * - les clés API ;
+ * - les secrets webhook ;
+ * - le corps brut complet des webhooks ;
+ * - le contenu binaire du PDF.
+ * Les données bancaires sont collectées exclusivement
+ * sur la page sécurisée du prestataire de paiement.
+ * ============================================================================
+ */
+
+/**
+ * Devises autorisées.
+ */
+enum DonationCurrency {
+  XOF
+  EUR
+  USD
+}
+
+/**
+ * Fréquence déclarée du don.
+ */
+enum DonationFrequency {
+  once
+  monthly
+}
+
+/**
+ * Domaines pouvant recevoir un don.
+ * Ces valeurs correspondent exactement
+ * aux identifiants de types/donation.ts.
+ */
+enum DonationAllocation {
+  priority
+  education
+  foodSupport
+  health
+  clothing
+  children
+  womenFamilies
+  waterHygiene
+  emergency
+}
+
+/**
+ * Prestataires reconnus par l’application.
+ * Moneroo est le prestataire principal.
+ * Les autres valeurs sont conservées pour
+ * la compatibilité avec les types existants.
+ */
+enum DonationPaymentProvider {
+  moneroo
+  fedapay
+  kkiapay
+  paydunya
+  stripe
+}
+
+/**
+ * Statuts internes d’un paiement.
+ * Seul paid confirme définitivement le don.
+ */
+enum DonationPaymentStatus {
+  pending
+  processing
+  paid
+  failed
+  cancelled
+  expired
+  refunded
+}
+
+/**
+ * Statut du traitement d’un webhook.
+ */
+enum DonationWebhookStatus {
+  received
+  processing
+  processed
+  ignored
+  failed
+}
+
+/**
+ * Statut de génération du reçu PDF.
+ */
+enum DonationReceiptStatus {
+  pending
+  generating
+  ready
+  failed
+}
+
+/**
+ * Statut d’envoi de l’e-mail contenant le reçu.
+ */
+enum DonationReceiptEmailStatus {
+  pending
+  sending
+  sent
+  failed
+}
+
+/**
+ * Langue utilisée pour le reçu et le message.
+ */
+enum DonationReceiptLanguage {
+  fr
+  en
+}
+
+/**
+ * ============================================================================
+ * PAIEMENT D’UN DON
+ * ============================================================================
+ * Cet enregistrement est créé avant la redirection
+ * vers Moneroo.
+ * Il conserve les données attendues afin que le serveur
+ * puisse ensuite comparer :
+ * - la référence interne ;
+ * - la référence Moneroo ;
+ * - le montant ;
+ * - la devise ;
+ * - le statut réel.
+ */
+model DonationPayment {
+  /**
+   * Identifiant technique interne.
+   */
+  id String @id @default(cuid())
+
+  /**
+   * Référence publique unique Young Caring.
+   */
+  reference String @unique @db.VarChar(100)
+
+  /**
+   * Prestataire responsable du paiement.
+   */
+  provider DonationPaymentProvider
+
+  /**
+   * Identifiant retourné par le prestataire.
+   * Il reste null avant la création réussie
+   * de la session de paiement.
+   */
+  providerReference String? @unique @db.VarChar(200)
+
+  /**
+   * Montant attendu dans l’unité principale
+   * de la devise.
+   * Exemples :
+   * - 5 000 représente 5 000 XOF ;
+   * - 25 représente 25 EUR ;
+   * - 50 représente 50 USD.
+   */
+  amount Int
+
+  /**
+   * Devise du paiement.
+   */
+  currency DonationCurrency
+
+  /**
+   * Fréquence déclarée.
+   */
+  frequency DonationFrequency
+
+  /**
+   * Domaine soutenu.
+   */
+  allocation DonationAllocation
+
+  /**
+   * Informations du donateur nécessaires
+   * au reçu et à l’envoi de l’e-mail.
+   * Ces informations restent privées.
+   */
+  donorFirstName String @db.VarChar(100)
+
+  donorLastName String @db.VarChar(100)
+
+  donorEmail String @db.VarChar(320)
+
+  donorPhone String? @db.VarChar(50)
+
+  donorCountry String? @db.VarChar(100)
+
+  /**
+   * Si true, l’identité du donateur ne doit
+   * jamais être affichée publiquement.
+   * Le reçu privé envoyé au donateur peut néanmoins
+   * contenir ses informations personnelles.
+   */
+  anonymous Boolean @default(false)
+
+  /**
+   * Statut interne du paiement.
+   */
+  status DonationPaymentStatus @default(pending)
+
+  /**
+   * Date de confirmation réelle du paiement.
+   * Elle est renseignée uniquement après une
+   * vérification directe auprès du prestataire.
+   */
+  paidAt DateTime? @db.Timestamptz(3)
+
+  /**
+   * Date de la dernière vérification serveur.
+   */
+  lastVerifiedAt DateTime? @db.Timestamptz(3)
+
+  /**
+   * Nombre de vérifications effectuées.
+   */
+  verificationCount Int @default(0)
+
+  /**
+   * Relations.
+   */
+  webhookEvents DonationWebhookEvent[]
+
+  receipt DonationReceipt?
+
+  /**
+   * Dates techniques.
+   */
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@index([provider, status])
+  @@index([donorEmail, createdAt])
+  @@index([currency, status])
+  @@index([paidAt])
+  @@map("donation_payments")
+}
+
+/**
+ * ============================================================================
+ * ÉVÉNEMENT WEBHOOK
+ * ============================================================================
+ * Le webhook ne confirme jamais directement un don.
+ * Après validation de sa signature, il déclenche
+ * une vérification directe auprès de Moneroo.
+ */
+model DonationWebhookEvent {
+  /**
+   * Identifiant technique interne.
+   */
+  id String @id @default(cuid())
+
+  /**
+   * Prestataire ayant envoyé l’événement.
+   */
+  provider DonationPaymentProvider
+
+  /**
+   * Identifiant fourni par le prestataire,
+   * lorsqu’il est disponible.
+   */
+  eventId String? @db.VarChar(200)
+
+  /**
+   * Clé d’idempotence calculée côté serveur.
+   * Elle empêche le traitement multiple
+   * du même événement.
+   */
+  deduplicationKey String @unique @db.VarChar(255)
+
+  /**
+   * Référence de la transaction chez
+   * le prestataire.
+   */
+  providerReference String @db.VarChar(200)
+
+  /**
+   * Type brut de l’événement.
+   */
+  eventType String? @db.VarChar(150)
+
+  /**
+   * Empreinte SHA-256 du corps brut.
+   * Le corps complet du webhook n’est pas
+   * enregistré dans la base.
+   */
+  payloadHash String @db.Char(64)
+
+  /**
+   * Indique si la signature du webhook
+   * a été validée.
+   */
+  signatureVerified Boolean @default(false)
+
+  /**
+   * État du traitement interne.
+   */
+  status DonationWebhookStatus @default(received)
+
+  /**
+   * Nombre de tentatives de traitement.
+   */
+  attemptCount Int @default(0)
+
+  /**
+   * Dernière erreur technique nettoyée.
+   * Ce champ ne doit jamais contenir :
+   * - une clé API ;
+   * - un secret webhook ;
+   * - une chaîne de connexion ;
+   * - le corps complet du webhook.
+   */
+  lastError String? @db.VarChar(500)
+
+  /**
+   * Paiement éventuellement associé.
+   */
+  paymentId String?
+
+  payment DonationPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  /**
+   * Dates techniques.
+   */
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  processingStartedAt DateTime? @db.Timestamptz(3)
+
+  processedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([provider, eventId])
+  @@index([providerReference])
+  @@index([status, receivedAt])
+  @@index([paymentId])
+  @@map("donation_webhook_events")
+}
+
+/**
+ * ============================================================================
+ * REÇU DE DON
+ * ============================================================================
+ * Un reçu est associé à un seul paiement.
+ * Il ne doit être généré qu’après confirmation
+ * du statut paid par le serveur.
+ * Le fichier PDF n’est pas enregistré directement
+ * dans PostgreSQL.
+ * La base conserve uniquement :
+ * - son numéro officiel ;
+ * - son emplacement privé ;
+ * - son empreinte SHA-256 ;
+ * - son statut de génération ;
+ * - son statut d’envoi par e-mail.
+ */
+model DonationReceipt {
+  /**
+   * Identifiant technique interne.
+   */
+  id String @id @default(cuid())
+
+  /**
+   * Numéro officiel et unique du reçu.
+   * Exemple de forme possible :
+   * YC-2026-000001
+   * La génération réelle sera effectuée
+   * côté serveur.
+   */
+  receiptNumber String @unique @db.VarChar(100)
+
+  /**
+   * Paiement associé.
+   * La contrainte unique garantit qu’un paiement
+   * ne possède qu’un seul reçu officiel.
+   */
+  paymentId String @unique
+
+  payment DonationPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  /**
+   * Langue du reçu et du message de remerciement.
+   */
+  language DonationReceiptLanguage @default(fr)
+
+  /**
+   * Statut de génération du PDF.
+   */
+  status DonationReceiptStatus @default(pending)
+
+  /**
+   * Clé privée du fichier PDF dans le stockage.
+   * Ce champ ne doit pas contenir une URL publique
+   * permanente.
+   */
+  pdfStorageKey String? @db.VarChar(500)
+
+  /**
+   * Empreinte SHA-256 du fichier PDF.
+   * Elle permet de vérifier que le document
+   * n’a pas été modifié.
+   */
+  pdfSha256 String? @db.Char(64)
+
+  /**
+   * Taille du PDF en octets.
+   */
+  pdfSizeBytes Int?
+
+  /**
+   * Date de génération réussie du PDF.
+   */
+  pdfGeneratedAt DateTime? @db.Timestamptz(3)
+
+  /**
+   * Dernière erreur de génération du PDF.
+   * Le message doit rester limité et nettoyé.
+   */
+  generationError String? @db.VarChar(500)
+
+  /**
+   * Statut d’envoi de l’e-mail.
+   */
+  emailStatus DonationReceiptEmailStatus @default(pending)
+
+  /**
+   * Adresse ayant reçu le reçu.
+   * Elle est conservée comme preuve technique
+   * de destination au moment de l’envoi.
+   */
+  emailRecipient String @db.VarChar(320)
+
+  /**
+   * Identifiant retourné par Resend,
+   * lorsqu’il est disponible.
+   */
+  emailProviderMessageId String? @unique @db.VarChar(200)
+
+  /**
+   * Nombre de tentatives d’envoi.
+   */
+  emailAttemptCount Int @default(0)
+
+  /**
+   * Date de la dernière tentative d’envoi.
+   */
+  emailLastAttemptAt DateTime? @db.Timestamptz(3)
+
+  /**
+   * Date de l’envoi réussi.
+   */
+  emailSentAt DateTime? @db.Timestamptz(3)
+
+  /**
+   * Dernière erreur d’envoi nettoyée.
+   */
+  emailLastError String? @db.VarChar(500)
+
+  /**
+   * Dates techniques.
+   */
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@index([emailStatus, createdAt])
+  @@index([emailRecipient, createdAt])
+  @@index([pdfGeneratedAt])
+  @@index([emailSentAt])
+  @@map("donation_receipts")
+}

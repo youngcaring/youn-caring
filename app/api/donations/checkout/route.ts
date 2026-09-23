@@ -1,77 +1,184 @@
-import { NextResponse } from "next/server";
+import {
+  NextResponse,
+} from "next/server";
+
 import type {
   NextRequest,
 } from "next/server";
 
 import {
   createPaymentSession,
+  hasRegisteredPaymentProvider,
   PaymentConfigurationError,
   PaymentProviderError,
+  registerPaymentProvider,
 } from "@/lib/donation/payment-provider";
+
 import {
   generateDonationReference,
 } from "@/lib/donation/payment-reference";
+
+import {
+  monerooPaymentProvider,
+} from "@/lib/donation/providers/moneroo-provider";
+
 import {
   validateDonationCheckout,
 } from "@/lib/donation/validation";
 
-/*
- * Cette route utilise des fonctionnalités Node.js,
- * notamment pour la génération sécurisée des références.
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * CRÉATION D’UNE SESSION DE PAIEMENT
+ * ============================================================================
+ *
+ * Cette route :
+ *
+ * - accepte uniquement les requêtes POST ;
+ * - vérifie strictement l’origine de la requête ;
+ * - autorise localhost uniquement en développement ;
+ * - limite le nombre de requêtes par adresse IP ;
+ * - contrôle le type et la taille du corps ;
+ * - valide entièrement les données du don ;
+ * - génère une référence Young Caring sécurisée ;
+ * - crée une session de paiement auprès de Moneroo ;
+ * - ne reçoit et ne conserve aucune donnée bancaire ;
+ * - ne retourne aucun secret au navigateur.
+ * ============================================================================
  */
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-const MAX_REQUEST_SIZE = 32_000;
-const RATE_LIMIT_WINDOW = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 5;
-const MAX_RATE_LIMIT_ENTRIES = 10_000;
+export const runtime =
+  "nodejs";
 
-type RateLimitEntry = Readonly<{
-  count: number;
-  expiresAt: number;
-}>;
+export const dynamic =
+  "force-dynamic";
 
-type RateLimitResult = Readonly<{
-  limited: boolean;
-  retryAfter: number;
-}>;
+export const revalidate =
+  0;
 
-/*
+const MAX_REQUEST_SIZE =
+  32_000;
+
+const RATE_LIMIT_WINDOW =
+  60_000;
+
+const RATE_LIMIT_MAX_REQUESTS =
+  5;
+
+const MAX_RATE_LIMIT_ENTRIES =
+  10_000;
+
+const DEVELOPMENT_HOSTNAMES =
+  new Set<string>([
+    "localhost",
+    "127.0.0.1",
+    "::1",
+    "[::1]",
+  ]);
+
+type RateLimitEntry =
+  Readonly<{
+    count: number;
+    expiresAt: number;
+  }>;
+
+type RateLimitResult =
+  Readonly<{
+    limited: boolean;
+    retryAfter: number;
+  }>;
+
+/**
  * Limitation temporaire en mémoire.
  *
- * Sur une production utilisant plusieurs serveurs,
+ * Dans une production utilisant plusieurs instances,
  * cette Map devra être remplacée par Redis, Upstash
  * ou une autre solution centralisée.
  */
-const rateLimitStore = new Map<
-  string,
-  RateLimitEntry
->();
+const rateLimitStore =
+  new Map<
+    string,
+    RateLimitEntry
+  >();
 
+/**
+ * Enregistre l’adaptateur Moneroo une seule fois
+ * dans le registre central des prestataires.
+ */
+if (
+  !hasRegisteredPaymentProvider(
+    "moneroo"
+  )
+) {
+  registerPaymentProvider(
+    monerooPaymentProvider
+  );
+}
+
+/**
+ * Retourne une réponse JSON sécurisée
+ * et non mise en cache.
+ */
 function jsonResponse(
   body: Record<string, unknown>,
   status: number,
-  additionalHeaders?: HeadersInit
+  additionalHeaders?:
+    Readonly<Record<string, string>>
 ): NextResponse {
-  return NextResponse.json(body, {
-    status,
+  return NextResponse.json(
+    body,
+    {
+      status,
 
-    headers: {
-      "Cache-Control":
-        "no-store, max-age=0",
-      Pragma: "no-cache",
-      Expires: "0",
-      "X-Content-Type-Options":
-        "nosniff",
-      ...additionalHeaders,
-    },
-  });
+      headers: {
+        "Cache-Control":
+          "no-store, max-age=0",
+
+        Pragma:
+          "no-cache",
+
+        Expires:
+          "0",
+
+        "X-Content-Type-Options":
+          "nosniff",
+
+        "Referrer-Policy":
+          "strict-origin-when-cross-origin",
+
+        ...additionalHeaders,
+      },
+    }
+  );
 }
 
-/*
- * Récupère l’adresse transmise par
- * le proxy d’hébergement.
+/**
+ * Nettoie une valeur utilisée comme
+ * identifiant de limitation.
+ */
+function normalizeClientIdentifier(
+  value: string
+): string | null {
+  const normalized =
+    value
+      .replace(
+        /[\u0000-\u001F\u007F]/g,
+        ""
+      )
+      .trim()
+      .slice(
+        0,
+        100
+      );
+
+  return normalized.length > 0
+    ? normalized
+    : null;
+}
+
+/**
+ * Récupère l’adresse IP transmise
+ * par le proxy d’hébergement.
  */
 function getClientIp(
   request: NextRequest
@@ -85,32 +192,46 @@ function getClientIp(
     const firstAddress =
       forwardedFor
         .split(",")
-        .at(0)
-        ?.trim();
+        .at(0);
 
     if (firstAddress) {
-      return firstAddress.slice(0, 100);
+      const normalizedAddress =
+        normalizeClientIdentifier(
+          firstAddress
+        );
+
+      if (normalizedAddress) {
+        return normalizedAddress;
+      }
     }
   }
 
   const realIp =
-    request.headers
-      .get("x-real-ip")
-      ?.trim();
+    request.headers.get(
+      "x-real-ip"
+    );
 
   if (realIp) {
-    return realIp.slice(0, 100);
+    const normalizedAddress =
+      normalizeClientIdentifier(
+        realIp
+      );
+
+    if (normalizedAddress) {
+      return normalizedAddress;
+    }
   }
 
-  /*
+  /**
    * En développement local, aucune adresse
-   * transmise par un proxy ne sera parfois disponible.
+   * fournie par un proxy ne sera parfois disponible.
    */
   return "unknown";
 }
 
-/*
- * Supprime toutes les entrées expirées.
+/**
+ * Supprime les entrées expirées
+ * du stockage de limitation.
  */
 function cleanExpiredRateLimitEntries(
   currentTime: number
@@ -122,30 +243,35 @@ function cleanExpiredRateLimitEntries(
     ] of rateLimitStore
   ) {
     if (
-      entry.expiresAt <= currentTime
+      entry.expiresAt <=
+      currentTime
     ) {
-      rateLimitStore.delete(identifier);
+      rateLimitStore.delete(
+        identifier
+      );
     }
   }
 }
 
-/*
- * Vérifie la limite de cinq tentatives
+/**
+ * Vérifie la limite de requêtes
  * par minute et par adresse IP.
  */
 function checkRateLimit(
   identifier: string
 ): RateLimitResult {
-  const currentTime = Date.now();
+  const currentTime =
+    Date.now();
 
-  /*
-   * Le nettoyage est exécuté régulièrement,
-   * ainsi que lorsque la limite est atteinte.
-   */
   if (
     rateLimitStore.size >=
       MAX_RATE_LIMIT_ENTRIES ||
-    rateLimitStore.size % 100 === 0
+    (
+      rateLimitStore.size > 0 &&
+      rateLimitStore.size %
+        100 ===
+        0
+    )
   ) {
     cleanExpiredRateLimitEntries(
       currentTime
@@ -153,17 +279,15 @@ function checkRateLimit(
   }
 
   const currentEntry =
-    rateLimitStore.get(identifier);
+    rateLimitStore.get(
+      identifier
+    );
 
   if (
     !currentEntry ||
     currentEntry.expiresAt <=
       currentTime
   ) {
-    /*
-     * Empêche la Map de dépasser sa limite
-     * lorsqu’aucune ancienne entrée n’est expirée.
-     */
     if (
       !currentEntry &&
       rateLimitStore.size >=
@@ -171,16 +295,25 @@ function checkRateLimit(
     ) {
       return {
         limited: true,
-        retryAfter: 60,
+
+        retryAfter:
+          Math.ceil(
+            RATE_LIMIT_WINDOW /
+              1_000
+          ),
       };
     }
 
-    rateLimitStore.set(identifier, {
-      count: 1,
-      expiresAt:
-        currentTime +
-        RATE_LIMIT_WINDOW,
-    });
+    rateLimitStore.set(
+      identifier,
+      {
+        count: 1,
+
+        expiresAt:
+          currentTime +
+          RATE_LIMIT_WINDOW,
+      }
+    );
 
     return {
       limited: false,
@@ -199,7 +332,8 @@ function checkRateLimit(
     Math.max(
       1,
       Math.ceil(
-        remainingMilliseconds / 1_000
+        remainingMilliseconds /
+          1_000
       )
     );
 
@@ -213,11 +347,16 @@ function checkRateLimit(
     };
   }
 
-  rateLimitStore.set(identifier, {
-    count: currentEntry.count + 1,
-    expiresAt:
-      currentEntry.expiresAt,
-  });
+  rateLimitStore.set(
+    identifier,
+    {
+      count:
+        currentEntry.count + 1,
+
+      expiresAt:
+        currentEntry.expiresAt,
+    }
+  );
 
   return {
     limited: false,
@@ -225,14 +364,19 @@ function checkRateLimit(
   };
 }
 
-/*
- * Charge et contrôle l’adresse officielle
- * configurée pour le site.
+/**
+ * Charge et contrôle l’adresse publique
+ * officielle configurée pour le site.
+ *
+ * NEXT_PUBLIC_SITE_URL doit conserver le domaine
+ * public Young Caring, y compris pendant les
+ * tests locaux.
  */
 function getConfiguredSiteUrl():
   URL | null {
   const configuredUrl =
-    process.env.NEXT_PUBLIC_SITE_URL
+    process.env
+      .NEXT_PUBLIC_SITE_URL
       ?.trim();
 
   if (!configuredUrl) {
@@ -241,16 +385,22 @@ function getConfiguredSiteUrl():
 
   try {
     const siteUrl =
-      new URL(configuredUrl);
+      new URL(
+        configuredUrl
+      );
 
     const isProduction =
       process.env.NODE_ENV ===
       "production";
 
     const protocolIsAllowed =
-      siteUrl.protocol === "https:" ||
-      (!isProduction &&
-        siteUrl.protocol === "http:");
+      siteUrl.protocol ===
+        "https:" ||
+      (
+        !isProduction &&
+        siteUrl.protocol ===
+          "http:"
+      );
 
     if (
       !protocolIsAllowed ||
@@ -260,38 +410,153 @@ function getConfiguredSiteUrl():
       return null;
     }
 
+    if (
+      siteUrl.search.length > 0 ||
+      siteUrl.hash.length > 0
+    ) {
+      return null;
+    }
+
+    /**
+     * L’adresse configurée doit représenter
+     * uniquement l’origine du site.
+     */
+    if (
+      siteUrl.pathname !== "/" &&
+      siteUrl.pathname !== ""
+    ) {
+      return null;
+    }
+
+    siteUrl.pathname = "/";
+
     return siteUrl;
   } catch {
     return null;
   }
 }
 
-/*
- * Refuse les requêtes provenant
- * d’un autre site.
+/**
+ * Vérifie l’origine de la requête.
+ *
+ * En production :
+ *
+ * - seule l’origine officielle configurée est autorisée.
+ *
+ * En développement :
+ *
+ * - l’origine officielle reste autorisée ;
+ * - localhost est autorisé uniquement lorsqu’il
+ *   correspond exactement à l’origine Next.js.
  */
 function hasValidOrigin(
   request: NextRequest,
   siteUrl: URL
 ): boolean {
-  const origin =
-    request.headers.get("origin");
+  const originHeader =
+    request.headers.get(
+      "origin"
+    );
 
-  if (!origin) {
+  if (!originHeader) {
     return false;
   }
 
+  const fetchSite =
+    request.headers
+      .get("sec-fetch-site")
+      ?.trim()
+      .toLowerCase();
+
+  if (
+    fetchSite &&
+    fetchSite !==
+      "same-origin" &&
+    fetchSite !==
+      "same-site"
+  ) {
+    return false;
+  }
+
+  let submittedOrigin: URL;
+
   try {
-    return (
-      new URL(origin).origin ===
-      siteUrl.origin
-    );
+    submittedOrigin =
+      new URL(
+        originHeader
+      );
   } catch {
     return false;
   }
+
+  if (
+    submittedOrigin.username.length >
+      0 ||
+    submittedOrigin.password.length >
+      0
+  ) {
+    return false;
+  }
+
+  if (
+    submittedOrigin.origin ===
+    siteUrl.origin
+  ) {
+    return true;
+  }
+
+  if (
+    process.env.NODE_ENV ===
+    "production"
+  ) {
+    return false;
+  }
+
+  if (
+    !DEVELOPMENT_HOSTNAMES.has(
+      submittedOrigin.hostname
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    submittedOrigin.protocol !==
+      "http:" &&
+    submittedOrigin.protocol !==
+      "https:"
+  ) {
+    return false;
+  }
+
+  return (
+    submittedOrigin.origin ===
+    request.nextUrl.origin
+  );
 }
 
-/*
+/**
+ * Vérifie que le corps utilise
+ * le type application/json.
+ */
+function hasJsonContentType(
+  request: NextRequest
+): boolean {
+  const contentType =
+    request.headers
+      .get("content-type")
+      ?.split(";")
+      .at(0)
+      ?.trim()
+      .toLowerCase();
+
+  return (
+    contentType ===
+    "application/json"
+  );
+}
+
+/**
  * Vérifie la taille annoncée dans
  * l’en-tête Content-Length.
  */
@@ -308,10 +573,12 @@ function requestIsTooLarge(
   }
 
   const declaredLength =
-    Number(contentLength);
+    Number(
+      contentLength
+    );
 
   if (
-    !Number.isFinite(
+    !Number.isSafeInteger(
       declaredLength
     ) ||
     declaredLength < 0
@@ -325,6 +592,29 @@ function requestIsTooLarge(
   );
 }
 
+/**
+ * Retourne un statut HTTP pouvant être
+ * exposé au navigateur sans révéler les
+ * détails internes du prestataire.
+ */
+function getSafeProviderStatusCode(
+  statusCode: number
+): number {
+  if (
+    statusCode === 400 ||
+    statusCode === 409 ||
+    statusCode === 422 ||
+    statusCode === 429
+  ) {
+    return statusCode;
+  }
+
+  return 502;
+}
+
+/**
+ * Crée une session de paiement pour un don.
+ */
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse> {
@@ -332,9 +622,18 @@ export async function POST(
     getConfiguredSiteUrl();
 
   if (!siteUrl) {
+    console.error(
+      "Donation checkout configuration error:",
+      {
+        code:
+          "INVALID_NEXT_PUBLIC_SITE_URL",
+      }
+    );
+
     return jsonResponse(
       {
         success: false,
+
         error:
           "PAYMENT_CONFIGURATION_ERROR",
       },
@@ -351,6 +650,7 @@ export async function POST(
     return jsonResponse(
       {
         success: false,
+
         error:
           "INVALID_REQUEST_ORIGIN",
       },
@@ -359,41 +659,42 @@ export async function POST(
   }
 
   const clientIp =
-    getClientIp(request);
+    getClientIp(
+      request
+    );
 
   const rateLimit =
-    checkRateLimit(clientIp);
+    checkRateLimit(
+      clientIp
+    );
 
   if (rateLimit.limited) {
     return jsonResponse(
       {
         success: false,
+
         error:
           "TOO_MANY_PAYMENT_REQUESTS",
       },
       429,
       {
         "Retry-After":
-          rateLimit.retryAfter.toString(),
+          rateLimit
+            .retryAfter
+            .toString(),
       }
     );
   }
 
-  const contentType =
-    request.headers.get(
-      "content-type"
-    ) ?? "";
-
   if (
-    !contentType
-      .toLowerCase()
-      .startsWith(
-        "application/json"
-      )
+    !hasJsonContentType(
+      request
+    )
   ) {
     return jsonResponse(
       {
         success: false,
+
         error:
           "UNSUPPORTED_CONTENT_TYPE",
       },
@@ -401,10 +702,15 @@ export async function POST(
     );
   }
 
-  if (requestIsTooLarge(request)) {
+  if (
+    requestIsTooLarge(
+      request
+    )
+  ) {
     return jsonResponse(
       {
         success: false,
+
         error:
           "REQUEST_TOO_LARGE",
       },
@@ -421,6 +727,7 @@ export async function POST(
     return jsonResponse(
       {
         success: false,
+
         error:
           "INVALID_REQUEST_BODY",
       },
@@ -428,10 +735,14 @@ export async function POST(
     );
   }
 
-  if (rawBody.length === 0) {
+  if (
+    rawBody.trim().length ===
+    0
+  ) {
     return jsonResponse(
       {
         success: false,
+
         error:
           "EMPTY_REQUEST_BODY",
       },
@@ -439,13 +750,22 @@ export async function POST(
     );
   }
 
+  /**
+   * Content-Length peut être absent avec certains
+   * proxies. La taille réelle du corps est donc
+   * également contrôlée après sa lecture.
+   */
   if (
-    rawBody.length >
+    Buffer.byteLength(
+      rawBody,
+      "utf8"
+    ) >
     MAX_REQUEST_SIZE
   ) {
     return jsonResponse(
       {
         success: false,
+
         error:
           "REQUEST_TOO_LARGE",
       },
@@ -457,35 +777,45 @@ export async function POST(
 
   try {
     input =
-      JSON.parse(rawBody) as unknown;
+      JSON.parse(
+        rawBody
+      ) as unknown;
   } catch {
     return jsonResponse(
       {
         success: false,
-        error: "INVALID_JSON",
+
+        error:
+          "INVALID_JSON",
       },
       400
     );
   }
 
-  /*
+  /**
    * La validation vérifie notamment :
+   *
    * - la fréquence ;
    * - le montant ;
    * - la devise XOF, EUR ou USD ;
-   * - les limites propres à la devise ;
+   * - les limites propres à chaque devise ;
+   * - le domaine soutenu ;
    * - les informations du donateur ;
    * - le consentement.
    */
   const validation =
-    validateDonationCheckout(input);
+    validateDonationCheckout(
+      input
+    );
 
   if (!validation.success) {
     return jsonResponse(
       {
         success: false,
+
         error:
           "DONATION_VALIDATION_FAILED",
+
         fieldErrors:
           validation.errors,
       },
@@ -493,23 +823,56 @@ export async function POST(
     );
   }
 
-  const reference =
-    generateDonationReference();
+  let reference: string;
 
-  const successUrl = new URL(
-    "/don/succes",
-    siteUrl
-  );
+  try {
+    reference =
+      generateDonationReference();
+  } catch (error: unknown) {
+    console.error(
+      "Donation reference generation failed:",
+      {
+        name:
+          error instanceof Error
+            ? error.name
+            : "UnknownError",
+      }
+    );
+
+    return jsonResponse(
+      {
+        success: false,
+
+        error:
+          "PAYMENT_INITIALIZATION_FAILED",
+      },
+      500
+    );
+  }
+
+  /**
+   * Les URL de retour reposent toujours
+   * sur le domaine public officiel.
+   *
+   * Moneroo ne doit jamais rediriger un utilisateur
+   * réel vers une adresse localhost.
+   */
+  const successUrl =
+    new URL(
+      "/don/succes",
+      siteUrl
+    );
 
   successUrl.searchParams.set(
     "reference",
     reference
   );
 
-  const cancelUrl = new URL(
-    "/don/annule",
-    siteUrl
-  );
+  const cancelUrl =
+    new URL(
+      "/don/annule",
+      siteUrl
+    );
 
   cancelUrl.searchParams.set(
     "reference",
@@ -517,17 +880,16 @@ export async function POST(
   );
 
   try {
-    /*
-     * validation.data contient directement la devise
-     * choisie : XOF, EUR ou USD.
-     */
     const paymentSession =
       await createPaymentSession({
         reference,
+
         donation:
           validation.data,
+
         successUrl:
           successUrl.toString(),
+
         cancelUrl:
           cancelUrl.toString(),
       });
@@ -535,16 +897,18 @@ export async function POST(
     return jsonResponse(
       {
         success: true,
+
         reference,
+
         checkoutUrl:
           paymentSession.checkoutUrl,
       },
       201
     );
   } catch (error: unknown) {
-    /*
-     * Aucun secret et aucun détail interne
-     * ne sont renvoyés au navigateur.
+    /**
+     * Aucun secret, jeton ou contenu sensible
+     * n’est retourné au navigateur.
      */
     if (
       error instanceof
@@ -552,12 +916,23 @@ export async function POST(
     ) {
       console.error(
         "Payment configuration error:",
-        error.message
+        {
+          code:
+            error.code,
+
+          /**
+           * Ce message indique seulement le nom
+           * du paramètre invalide ou absent.
+           */
+          message:
+            error.message,
+        }
       );
 
       return jsonResponse(
         {
           success: false,
+
           error:
             "PAYMENT_SERVICE_NOT_CONFIGURED",
         },
@@ -571,21 +946,27 @@ export async function POST(
     ) {
       console.error(
         "Payment provider error:",
-        error.code
+        {
+          code:
+            error.code,
+
+          statusCode:
+            error.statusCode,
+        }
       );
 
       const safeStatus =
-        error.statusCode >= 400 &&
-        error.statusCode <= 499
-          ? error.statusCode
-          : 502;
+        getSafeProviderStatusCode(
+          error.statusCode
+        );
 
       return jsonResponse(
         {
           success: false,
+
           error:
-            error.statusCode >= 400 &&
-            error.statusCode <= 499
+            safeStatus >= 400 &&
+            safeStatus <= 499
               ? "PAYMENT_REQUEST_REJECTED"
               : "PAYMENT_SERVICE_UNAVAILABLE",
         },
@@ -595,12 +976,18 @@ export async function POST(
 
     console.error(
       "Unexpected payment initialization error:",
-      error
+      {
+        name:
+          error instanceof Error
+            ? error.name
+            : "UnknownError",
+      }
     );
 
     return jsonResponse(
       {
         success: false,
+
         error:
           "PAYMENT_INITIALIZATION_FAILED",
       },
@@ -609,18 +996,46 @@ export async function POST(
   }
 }
 
-/*
- * Cette route accepte uniquement POST.
+/**
+ * Réponse commune aux méthodes HTTP
+ * qui ne sont pas autorisées.
  */
-export function GET(): NextResponse {
+function methodNotAllowed():
+  NextResponse {
   return jsonResponse(
     {
       success: false,
-      error: "METHOD_NOT_ALLOWED",
+
+      error:
+        "METHOD_NOT_ALLOWED",
     },
     405,
     {
-      Allow: "POST",
+      Allow:
+        "POST",
     }
   );
+}
+
+/**
+ * Cette route accepte uniquement POST.
+ */
+export function GET():
+  NextResponse {
+  return methodNotAllowed();
+}
+
+export function PUT():
+  NextResponse {
+  return methodNotAllowed();
+}
+
+export function PATCH():
+  NextResponse {
+  return methodNotAllowed();
+}
+
+export function DELETE():
+  NextResponse {
+  return methodNotAllowed();
 }

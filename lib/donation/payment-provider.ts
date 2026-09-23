@@ -1,7 +1,10 @@
+import "server-only";
+
 import {
   getDonationLimits,
   isDonationCurrency,
 } from "@/data/donation";
+
 import type {
   CreatePaymentSessionInput,
   DonationPaymentProvider,
@@ -11,16 +14,35 @@ import type {
   PaymentVerificationResult,
 } from "@/types/donation";
 
-/*
- * Cette couche empêche le site de fabriquer
- * ou de confirmer lui-même un faux paiement.
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * COUCHE CENTRALE DES PRESTATAIRES DE PAIEMENT
+ * ============================================================================
+ *
+ * Cette couche empêche le site de fabriquer ou de confirmer
+ * lui-même un faux paiement.
+ *
+ * Elle :
+ *
+ * - charge la configuration privée du prestataire ;
+ * - conserve un registre des adaptateurs installés ;
+ * - valide les données avant les appels externes ;
+ * - vérifie les réponses retournées par les prestataires ;
+ * - contrôle strictement les URL de redirection ;
+ * - délègue la validation cryptographique des webhooks ;
+ * - ne considère jamais une redirection comme une preuve de paiement.
  *
  * Tant qu’un véritable adaptateur n’est pas installé,
  * toutes les tentatives sont refusées proprement.
+ *
+ * Ce fichier doit rester exclusivement côté serveur.
+ * ============================================================================
  */
 
 const SUPPORTED_PROVIDERS:
   readonly DonationPaymentProviderName[] = [
+  "moneroo",
   "fedapay",
   "kkiapay",
   "paydunya",
@@ -41,14 +63,32 @@ const VALID_PAYMENT_STATUSES:
 const INTERNAL_REFERENCE_PATTERN =
   /^YC-\d{8}-[A-F0-9]{12}$/;
 
-const MIN_PROVIDER_REFERENCE_LENGTH = 3;
-const MAX_PROVIDER_REFERENCE_LENGTH = 200;
-const MAX_WEBHOOK_SIZE = 1_000_000;
-const MAX_SIGNATURE_LENGTH = 1_000;
+const PROVIDER_REFERENCE_PATTERN =
+  /^[A-Za-z0-9._:-]+$/;
 
-export class PaymentConfigurationError extends Error {
+const MIN_PROVIDER_REFERENCE_LENGTH =
+  3;
+
+const MAX_PROVIDER_REFERENCE_LENGTH =
+  200;
+
+const MAX_WEBHOOK_SIZE =
+  1_000_000;
+
+const MAX_SIGNATURE_LENGTH =
+  1_000;
+
+/**
+ * Erreur liée à la configuration privée
+ * du système de paiement.
+ */
+export class PaymentConfigurationError
+  extends Error {
   readonly code =
     "PAYMENT_PROVIDER_NOT_CONFIGURED";
+
+  readonly statusCode =
+    500;
 
   constructor(
     message =
@@ -58,10 +98,20 @@ export class PaymentConfigurationError extends Error {
 
     this.name =
       "PaymentConfigurationError";
+
+    Object.setPrototypeOf(
+      this,
+      new.target.prototype
+    );
   }
 }
 
-export class PaymentProviderError extends Error {
+/**
+ * Erreur contrôlée provenant d’un prestataire
+ * ou d’une validation de paiement.
+ */
+export class PaymentProviderError
+  extends Error {
   readonly code: string;
   readonly statusCode: number;
 
@@ -75,16 +125,25 @@ export class PaymentProviderError extends Error {
     this.name =
       "PaymentProviderError";
 
-    this.code = code;
+    this.code =
+      code;
 
     this.statusCode =
       statusCode >= 400 &&
       statusCode <= 599
         ? statusCode
         : 502;
+
+    Object.setPrototypeOf(
+      this,
+      new.target.prototype
+    );
   }
 }
 
+/**
+ * Configuration privée du prestataire actif.
+ */
 export type PaymentProviderConfiguration =
   Readonly<{
     name:
@@ -93,8 +152,9 @@ export type PaymentProviderConfiguration =
     webhookSecret: string;
   }>;
 
-/*
- * Vérifie le nom du prestataire à l’exécution.
+/**
+ * Vérifie le nom du prestataire
+ * à l’exécution.
  */
 export function isSupportedPaymentProvider(
   value: unknown
@@ -108,7 +168,7 @@ export function isSupportedPaymentProvider(
   );
 }
 
-/*
+/**
  * Charge les secrets uniquement côté serveur.
  *
  * Ce fichier ne doit jamais être importé dans
@@ -158,7 +218,7 @@ export function getPaymentProviderConfiguration():
   };
 }
 
-/*
+/**
  * Registre privé des adaptateurs installés.
  */
 const providerRegistry =
@@ -167,8 +227,12 @@ const providerRegistry =
     DonationPaymentProvider
   >();
 
-/*
+/**
  * Enregistre un adaptateur une seule fois.
+ *
+ * Lors des rechargements de développement,
+ * le même objet peut être présenté plusieurs fois.
+ * Ce cas reste idempotent.
  */
 export function registerPaymentProvider(
   provider: DonationPaymentProvider
@@ -183,11 +247,19 @@ export function registerPaymentProvider(
     );
   }
 
-  if (
-    providerRegistry.has(
+  const registeredProvider =
+    providerRegistry.get(
       provider.name
-    )
+    );
+
+  if (
+    registeredProvider ===
+    provider
   ) {
+    return;
+  }
+
+  if (registeredProvider) {
     throw new PaymentConfigurationError(
       `Le prestataire ${provider.name} est déjà enregistré.`
     );
@@ -199,7 +271,20 @@ export function registerPaymentProvider(
   );
 }
 
-/*
+/**
+ * Indique si un adaptateur précis
+ * est déjà enregistré.
+ */
+export function hasRegisteredPaymentProvider(
+  name:
+    DonationPaymentProviderName
+): boolean {
+  return providerRegistry.has(
+    name
+  );
+}
+
+/**
  * Retourne uniquement l’adaptateur correspondant
  * au prestataire configuré dans les variables
  * d’environnement.
@@ -232,7 +317,7 @@ export function getPaymentProvider():
   return provider;
 }
 
-/*
+/**
  * Crée une session chez le véritable
  * prestataire de paiement.
  *
@@ -241,22 +326,30 @@ export function getPaymentProvider():
  * une seconde fois avant l’appel externe.
  */
 export async function createPaymentSession(
-  input: CreatePaymentSessionInput
+  input:
+    CreatePaymentSessionInput
 ): Promise<PaymentSessionResult> {
-  validatePaymentSessionInput(input);
-  validatePaymentSessionUrls(input);
+  validatePaymentSessionInput(
+    input
+  );
+
+  validatePaymentSessionUrls(
+    input
+  );
 
   const provider =
     getPaymentProvider();
 
-  let result: PaymentSessionResult;
+  let result:
+    PaymentSessionResult;
 
   try {
     result =
-      await provider.createPaymentSession(
-        input
-      );
-  } catch (error) {
+      await provider
+        .createPaymentSession(
+          input
+        );
+  } catch (error: unknown) {
     if (
       error instanceof
         PaymentConfigurationError ||
@@ -281,7 +374,7 @@ export async function createPaymentSession(
   return result;
 }
 
-/*
+/**
  * Vérifie une transaction directement
  * auprès du prestataire.
  *
@@ -307,7 +400,7 @@ export async function verifyPayment(
       await provider.verifyPayment(
         normalizedReference
       );
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof
         PaymentConfigurationError ||
@@ -332,27 +425,42 @@ export async function verifyPayment(
   return result;
 }
 
-/*
+/**
  * Vérifie la signature d’un webhook.
  *
- * La vérification réelle doit obligatoirement
- * être effectuée par l’adaptateur du prestataire
- * avec son secret officiel.
+ * La vérification réelle est effectuée par
+ * l’adaptateur du prestataire avec son secret.
  */
 export async function verifyPaymentWebhook(
   rawBody: string,
   signature: string
 ): Promise<boolean> {
+  if (
+    typeof rawBody !== "string" ||
+    typeof signature !== "string"
+  ) {
+    return false;
+  }
+
   const normalizedSignature =
     signature.trim();
 
+  const bodySize =
+    Buffer.byteLength(
+      rawBody,
+      "utf8"
+    );
+
   if (
-    rawBody.length === 0 ||
-    rawBody.length >
+    bodySize === 0 ||
+    bodySize >
       MAX_WEBHOOK_SIZE ||
     normalizedSignature.length === 0 ||
     normalizedSignature.length >
-      MAX_SIGNATURE_LENGTH
+      MAX_SIGNATURE_LENGTH ||
+    /[\r\n]/.test(
+      normalizedSignature
+    )
   ) {
     return false;
   }
@@ -366,12 +474,10 @@ export async function verifyPaymentWebhook(
         rawBody,
         normalizedSignature
       );
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof
-        PaymentConfigurationError ||
-      error instanceof
-        PaymentProviderError
+        PaymentConfigurationError
     ) {
       throw error;
     }
@@ -380,15 +486,27 @@ export async function verifyPaymentWebhook(
   }
 }
 
-/*
- * Valide le montant et la devise juste avant
- * l’appel au prestataire.
+/**
+ * Valide le montant, la devise et la référence
+ * avant l’appel au prestataire.
  *
- * Aucune conversion de devise n’est effectuée ici.
+ * Aucune conversion de devise n’est effectuée.
  */
 function validatePaymentSessionInput(
-  input: CreatePaymentSessionInput
+  input:
+    CreatePaymentSessionInput
 ): void {
+  if (
+    !input ||
+    typeof input !== "object"
+  ) {
+    throw new PaymentProviderError(
+      "INVALID_PAYMENT_INPUT",
+      "Les données du paiement sont invalides.",
+      400
+    );
+  }
+
   if (
     !INTERNAL_REFERENCE_PATTERN.test(
       input.reference
@@ -401,11 +519,15 @@ function validatePaymentSessionInput(
     );
   }
 
-  const { amount, currency } =
-    input.donation;
+  const {
+    amount,
+    currency,
+  } = input.donation;
 
   if (
-    !isDonationCurrency(currency)
+    !isDonationCurrency(
+      currency
+    )
   ) {
     throw new PaymentProviderError(
       "UNSUPPORTED_CURRENCY",
@@ -415,7 +537,9 @@ function validatePaymentSessionInput(
   }
 
   if (
-    !Number.isSafeInteger(amount)
+    !Number.isSafeInteger(
+      amount
+    )
   ) {
     throw new PaymentProviderError(
       "INVALID_PAYMENT_AMOUNT",
@@ -425,7 +549,9 @@ function validatePaymentSessionInput(
   }
 
   const limits =
-    getDonationLimits(currency);
+    getDonationLimits(
+      currency
+    );
 
   if (
     amount < limits.minimum ||
@@ -439,16 +565,28 @@ function validatePaymentSessionInput(
   }
 }
 
-/*
- * Vérifie le résultat retourné lors de la création
- * d’une session de paiement.
+/**
+ * Vérifie le résultat retourné lors de la
+ * création d’une session de paiement.
  */
 function validatePaymentSessionResult(
-  result: PaymentSessionResult,
-  input: CreatePaymentSessionInput,
+  result:
+    PaymentSessionResult,
+  input:
+    CreatePaymentSessionInput,
   expectedProvider:
     DonationPaymentProviderName
 ): void {
+  if (
+    !result ||
+    typeof result !== "object"
+  ) {
+    throw new PaymentProviderError(
+      "INVALID_PAYMENT_SESSION_RESULT",
+      "La réponse du prestataire est invalide."
+    );
+  }
+
   if (
     result.provider !==
     expectedProvider
@@ -469,7 +607,10 @@ function validatePaymentSessionResult(
     );
   }
 
-  if (result.status !== "pending") {
+  if (
+    result.status !==
+    "pending"
+  ) {
     throw new PaymentProviderError(
       "INVALID_INITIAL_PAYMENT_STATUS",
       "Le statut initial du paiement est invalide."
@@ -485,16 +626,28 @@ function validatePaymentSessionResult(
   );
 }
 
-/*
- * Vérifie qu’une confirmation reçue du prestataire
- * possède un format cohérent.
+/**
+ * Vérifie qu’une transaction retournée par
+ * le prestataire possède un format cohérent.
  */
 function validatePaymentVerificationResult(
-  result: PaymentVerificationResult,
-  requestedProviderReference: string,
+  result:
+    PaymentVerificationResult,
+  requestedProviderReference:
+    string,
   expectedProvider:
     DonationPaymentProviderName
 ): void {
+  if (
+    !result ||
+    typeof result !== "object"
+  ) {
+    throw new PaymentProviderError(
+      "INVALID_PAYMENT_VERIFICATION_RESULT",
+      "La réponse de vérification du prestataire est invalide."
+    );
+  }
+
   if (
     result.provider !==
     expectedProvider
@@ -517,22 +670,28 @@ function validatePaymentVerificationResult(
   }
 
   if (
-    result.providerReference !== null
+    result.providerReference ===
+    null
   ) {
-    const returnedReference =
-      normalizeProviderReference(
-        result.providerReference
-      );
+    throw new PaymentProviderError(
+      "PROVIDER_REFERENCE_MISSING",
+      "La référence de transaction retournée est absente."
+    );
+  }
 
-    if (
-      returnedReference !==
-      requestedProviderReference
-    ) {
-      throw new PaymentProviderError(
-        "PROVIDER_REFERENCE_MISMATCH",
-        "La référence de transaction retournée ne correspond pas à la transaction demandée."
-      );
-    }
+  const returnedReference =
+    normalizeProviderReference(
+      result.providerReference
+    );
+
+  if (
+    returnedReference !==
+    requestedProviderReference
+  ) {
+    throw new PaymentProviderError(
+      "PROVIDER_REFERENCE_MISMATCH",
+      "La référence retournée ne correspond pas à la transaction demandée."
+    );
   }
 
   if (
@@ -570,12 +729,20 @@ function validatePaymentVerificationResult(
   }
 }
 
-/*
+/**
  * Nettoie et valide une référence externe.
  */
 function normalizeProviderReference(
   value: string
 ): string {
+  if (typeof value !== "string") {
+    throw new PaymentProviderError(
+      "INVALID_PROVIDER_REFERENCE",
+      "La référence du prestataire est invalide.",
+      400
+    );
+  }
+
   const normalizedValue =
     value.trim();
 
@@ -584,7 +751,7 @@ function normalizeProviderReference(
       MIN_PROVIDER_REFERENCE_LENGTH ||
     normalizedValue.length >
       MAX_PROVIDER_REFERENCE_LENGTH ||
-    /[\u0000-\u001F\u007F]/.test(
+    !PROVIDER_REFERENCE_PATTERN.test(
       normalizedValue
     )
   ) {
@@ -598,17 +765,30 @@ function normalizeProviderReference(
   return normalizedValue;
 }
 
-/*
+/**
  * Empêche une redirection vers un protocole
  * dangereux ou une URL contenant des identifiants.
  */
 function validateCheckoutUrl(
   value: string
 ): void {
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0
+  ) {
+    throw new PaymentProviderError(
+      "INVALID_CHECKOUT_URL",
+      "L’adresse de paiement retournée est invalide."
+    );
+  }
+
   let checkoutUrl: URL;
 
   try {
-    checkoutUrl = new URL(value);
+    checkoutUrl =
+      new URL(
+        value.trim()
+      );
   } catch {
     throw new PaymentProviderError(
       "INVALID_CHECKOUT_URL",
@@ -617,7 +797,8 @@ function validateCheckoutUrl(
   }
 
   if (
-    checkoutUrl.protocol !== "https:"
+    checkoutUrl.protocol !==
+    "https:"
   ) {
     throw new PaymentProviderError(
       "INSECURE_CHECKOUT_URL",
@@ -636,12 +817,13 @@ function validateCheckoutUrl(
   }
 }
 
-/*
+/**
  * Vérifie les URL de succès et d’annulation
  * créées par le site.
  */
 function validatePaymentSessionUrls(
-  input: CreatePaymentSessionInput
+  input:
+    CreatePaymentSessionInput
 ): void {
   const configuredSiteUrl =
     process.env.NEXT_PUBLIC_SITE_URL
@@ -659,16 +841,35 @@ function validatePaymentSessionUrls(
 
   try {
     siteUrl =
-      new URL(configuredSiteUrl);
+      new URL(
+        configuredSiteUrl
+      );
 
     successUrl =
-      new URL(input.successUrl);
+      new URL(
+        input.successUrl
+      );
 
     cancelUrl =
-      new URL(input.cancelUrl);
+      new URL(
+        input.cancelUrl
+      );
   } catch {
     throw new PaymentConfigurationError(
       "Une adresse de redirection est invalide."
+    );
+  }
+
+  if (
+    siteUrl.username.length > 0 ||
+    siteUrl.password.length > 0 ||
+    successUrl.username.length > 0 ||
+    successUrl.password.length > 0 ||
+    cancelUrl.username.length > 0 ||
+    cancelUrl.password.length > 0
+  ) {
+    throw new PaymentConfigurationError(
+      "Les adresses de redirection contiennent des informations interdites."
     );
   }
 
@@ -695,13 +896,11 @@ function validatePaymentSessionUrls(
   }
 
   if (
-    successUrl.username.length > 0 ||
-    successUrl.password.length > 0 ||
-    cancelUrl.username.length > 0 ||
-    cancelUrl.password.length > 0
+    successUrl.hash.length > 0 ||
+    cancelUrl.hash.length > 0
   ) {
     throw new PaymentConfigurationError(
-      "Les adresses de redirection contiennent des informations interdites."
+      "Les fragments d’URL sont interdits dans les redirections de paiement."
     );
   }
 
@@ -711,9 +910,11 @@ function validatePaymentSessionUrls(
 
   if (
     isProduction &&
-    (siteUrl.protocol !== "https:" ||
+    (
+      siteUrl.protocol !== "https:" ||
       successUrl.protocol !== "https:" ||
-      cancelUrl.protocol !== "https:")
+      cancelUrl.protocol !== "https:"
+    )
   ) {
     throw new PaymentConfigurationError(
       "HTTPS est obligatoire en production."
@@ -722,12 +923,29 @@ function validatePaymentSessionUrls(
 
   if (
     !isProduction &&
-    !["http:", "https:"].includes(
-      siteUrl.protocol
+    (
+      ![
+        "http:",
+        "https:",
+      ].includes(
+        siteUrl.protocol
+      ) ||
+      ![
+        "http:",
+        "https:",
+      ].includes(
+        successUrl.protocol
+      ) ||
+      ![
+        "http:",
+        "https:",
+      ].includes(
+        cancelUrl.protocol
+      )
     )
   ) {
     throw new PaymentConfigurationError(
-      "Le protocole du site est invalide."
+      "Le protocole d’une redirection est invalide."
     );
   }
 }

@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
 } from "react";
+
 import {
   AlertCircle,
 } from "lucide-react";
@@ -13,16 +14,22 @@ import DonationAllocationSelector from "@/components/donation/DonationAllocation
 import DonationAmountSelector from "@/components/donation/DonationAmountSelector";
 import DonationCurrencySelector from "@/components/donation/DonationCurrencySelector";
 import DonationFrequencySelector from "@/components/donation/DonationFrequencySelector";
+import DonationPaymentMethods from "@/components/donation/DonationPaymentMethods";
 import DonationStickySubmit from "@/components/donation/DonationStickySubmit";
 import DonationSummary from "@/components/donation/DonationSummary";
 import DonorInformationFields from "@/components/donation/DonorInformationFields";
-import { useLanguage } from "@/components/providers/LanguageProvider";
+
+import {
+  useLanguage,
+} from "@/components/providers/LanguageProvider";
+
 import {
   defaultDonationCurrency,
   formatDonationAmount,
   getDonationAmounts,
   getDonationLimits,
 } from "@/data/donation";
+
 import type {
   DonationAllocationId,
   DonationCheckoutResponse,
@@ -30,16 +37,49 @@ import type {
   DonationDonor,
   DonationFieldErrors,
   DonationFrequency,
+  DonationPaymentMethod,
 } from "@/types/donation";
 
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * FORMULAIRE PRINCIPAL DE DON
+ * ============================================================================
+ *
+ * Ce composant :
+ *
+ * - sélectionne la fréquence du don ;
+ * - sélectionne la devise ;
+ * - valide le montant ;
+ * - sélectionne le domaine soutenu ;
+ * - sélectionne la catégorie du moyen de paiement ;
+ * - collecte uniquement les informations nécessaires ;
+ * - ne collecte aucune donnée bancaire ;
+ * - transmet les données à la route serveur ;
+ * - redirige uniquement vers Young Caring ou Moneroo.
+ *
+ * Toutes les données sont validées une seconde fois côté serveur.
+ * ============================================================================
+ */
+
+const MAX_FIRST_NAME_LENGTH = 60;
+const MAX_LAST_NAME_LENGTH = 60;
 const MAX_EMAIL_LENGTH = 254;
 const MAX_PHONE_LENGTH = 30;
+const MAX_COUNTRY_LENGTH = 80;
 const MAX_CUSTOM_AMOUNT_LENGTH = 10;
 
 const EMAIL_PATTERN =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const initialDonor: DonationDonor = {
+const PHONE_PATTERN =
+  /^\+?[0-9\s().-]+$/;
+
+const MONEROO_ROOT_DOMAIN =
+  "moneroo.io";
+
+const initialDonor:
+  DonationDonor = {
   firstName: "",
   lastName: "",
   email: "",
@@ -49,39 +89,55 @@ const initialDonor: DonationDonor = {
   consent: false,
 };
 
-/*
+/**
  * Autorise uniquement :
- * - une adresse HTTPS externe ;
- * - une adresse HTTP ou HTTPS du même site.
+ *
+ * - une URL HTTP ou HTTPS appartenant au site actuel ;
+ * - une URL HTTPS appartenant à Moneroo.
+ *
+ * Une URL HTTPS externe arbitraire est refusée.
  */
 function getSafeRedirectUrl(
   value: string
 ): URL | null {
   try {
-    const url = new URL(
-      value,
-      window.location.origin
-    );
-
-    const isSecureExternalUrl =
-      url.protocol === "https:";
-
-    const isSameOriginUrl =
-      url.origin ===
-        window.location.origin &&
-      (url.protocol === "http:" ||
-        url.protocol === "https:");
-
-    if (
-      !isSecureExternalUrl &&
-      !isSameOriginUrl
-    ) {
-      return null;
-    }
+    const url =
+      new URL(
+        value,
+        window.location.origin
+      );
 
     if (
       url.username.length > 0 ||
       url.password.length > 0
+    ) {
+      return null;
+    }
+
+    const hostname =
+      url.hostname.toLowerCase();
+
+    const belongsToMoneroo =
+      hostname === MONEROO_ROOT_DOMAIN ||
+      hostname.endsWith(
+        `.${MONEROO_ROOT_DOMAIN}`
+      );
+
+    const isMonerooUrl =
+      url.protocol === "https:" &&
+      belongsToMoneroo;
+
+    const isSameOriginUrl =
+      url.origin ===
+        window.location.origin &&
+      (
+        url.protocol === "http:" ||
+        url.protocol === "https:"
+      );
+
+    if (
+      !isMonerooUrl &&
+      !isSameOriginUrl
     ) {
       return null;
     }
@@ -92,7 +148,7 @@ function getSafeRedirectUrl(
   }
 }
 
-/*
+/**
  * Retourne un montant initial adapté
  * à la devise sélectionnée.
  */
@@ -100,10 +156,14 @@ function getDefaultAmount(
   currency: DonationCurrency
 ): number {
   const suggestedAmounts =
-    getDonationAmounts(currency);
+    getDonationAmounts(
+      currency
+    );
 
   const limits =
-    getDonationLimits(currency);
+    getDonationLimits(
+      currency
+    );
 
   return (
     suggestedAmounts[1] ??
@@ -112,27 +172,99 @@ function getDefaultAmount(
   );
 }
 
+/**
+ * Vérifie un numéro de téléphone optionnel.
+ *
+ * Le signe + est autorisé uniquement au début.
+ */
+function isValidOptionalPhone(
+  phone: string
+): boolean {
+  if (phone.length === 0) {
+    return true;
+  }
+
+  if (
+    phone.length >
+      MAX_PHONE_LENGTH ||
+    !PHONE_PATTERN.test(phone)
+  ) {
+    return false;
+  }
+
+  const digits =
+    phone.replace(
+      /\D/g,
+      ""
+    );
+
+  return (
+    digits.length >= 6 &&
+    digits.length <= 20
+  );
+}
+
+/**
+ * Retourne le champ d’erreur correspondant
+ * à une propriété du donateur.
+ */
+function getDonorErrorField(
+  field: keyof DonationDonor
+): keyof DonationFieldErrors {
+  if (field === "anonymous") {
+    return "general";
+  }
+
+  return field;
+}
+
+/**
+ * Extrait un code d’erreur non sensible.
+ */
+function getSafeErrorCode(
+  error: unknown
+): string {
+  if (
+    error instanceof Error &&
+    error.message.trim().length > 0
+  ) {
+    return error.message
+      .trim()
+      .slice(0, 100);
+  }
+
+  return "UNKNOWN_DONATION_CHECKOUT_ERROR";
+}
+
 export default function DonationForm() {
-  const { language } = useLanguage();
-  const isFrench = language === "fr";
+  const { language } =
+    useLanguage();
 
-  const [currency, setCurrency] =
-    useState<DonationCurrency>(
-      defaultDonationCurrency
-    );
+  const isFrench =
+    language === "fr";
 
-  const [frequency, setFrequency] =
-    useState<DonationFrequency>(
-      "once"
-    );
+  const [
+    currency,
+    setCurrency,
+  ] = useState<DonationCurrency>(
+    defaultDonationCurrency
+  );
+
+  const [
+    frequency,
+    setFrequency,
+  ] = useState<DonationFrequency>(
+    "once"
+  );
 
   const [
     selectedAmount,
     setSelectedAmount,
-  ] = useState<number | null>(() =>
-    getDefaultAmount(
-      defaultDonationCurrency
-    )
+  ] = useState<number | null>(
+    () =>
+      getDefaultAmount(
+        defaultDonationCurrency
+      )
   );
 
   const [
@@ -140,64 +272,103 @@ export default function DonationForm() {
     setCustomAmount,
   ] = useState("");
 
-  const [allocation, setAllocation] =
-    useState<DonationAllocationId>(
-      "priority"
-    );
+  const [
+    allocation,
+    setAllocation,
+  ] = useState<DonationAllocationId>(
+    "priority"
+  );
 
-  const [donor, setDonor] =
-    useState<DonationDonor>(
-      initialDonor
-    );
+  const [
+    paymentMethod,
+    setPaymentMethod,
+  ] = useState<
+    DonationPaymentMethod | null
+  >(null);
 
-  const [errors, setErrors] =
-    useState<DonationFieldErrors>({});
+  const [
+    paymentMethodError,
+    setPaymentMethodError,
+  ] = useState("");
+
+  const [
+    donor,
+    setDonor,
+  ] = useState<DonationDonor>(
+    initialDonor
+  );
+
+  const [
+    errors,
+    setErrors,
+  ] = useState<DonationFieldErrors>(
+    {}
+  );
 
   const [
     generalError,
     setGeneralError,
   ] = useState("");
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
 
-  /*
-   * Champ invisible contre certaines
-   * soumissions automatiques.
+  /**
+   * Champ invisible utilisé comme honeypot
+   * contre certaines soumissions automatiques.
    */
-  const [website, setWebsite] =
-    useState("");
+  const [
+    website,
+    setWebsite,
+  ] = useState("");
 
-  const currencyLimits = useMemo(
-    () =>
-      getDonationLimits(currency),
-    [currency]
-  );
+  const currencyLimits =
+    useMemo(
+      () =>
+        getDonationLimits(
+          currency
+        ),
+      [currency]
+    );
 
-  const finalAmount = useMemo(() => {
-    if (customAmount.length > 0) {
-      const parsedAmount =
-        Number(customAmount);
+  const finalAmount =
+    useMemo(() => {
+      if (
+        customAmount.length > 0
+      ) {
+        const parsedAmount =
+          Number(
+            customAmount
+          );
 
-      return Number.isSafeInteger(
-        parsedAmount
-      )
-        ? parsedAmount
-        : 0;
-    }
+        return Number.isSafeInteger(
+          parsedAmount
+        )
+          ? parsedAmount
+          : 0;
+      }
 
-    return selectedAmount ?? 0;
-  }, [
-    customAmount,
-    selectedAmount,
-  ]);
+      return selectedAmount ?? 0;
+    }, [
+      customAmount,
+      selectedAmount,
+    ]);
 
   const amountIsValid =
-    Number.isSafeInteger(finalAmount) &&
+    Number.isSafeInteger(
+      finalAmount
+    ) &&
     finalAmount >=
       currencyLimits.minimum &&
     finalAmount <=
       currencyLimits.maximum;
+
+  const formCanBeSubmitted =
+    amountIsValid &&
+    paymentMethod !== null &&
+    !submitting;
 
   const updateDonor = <
     Key extends keyof DonationDonor
@@ -205,35 +376,49 @@ export default function DonationForm() {
     field: Key,
     value: DonationDonor[Key]
   ): void => {
-    setDonor((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setDonor(
+      (current) => ({
+        ...current,
+        [field]: value,
+      })
+    );
 
-    setErrors((current) => ({
-      ...current,
-      [field]: undefined,
-    }));
+    const errorField =
+      getDonorErrorField(
+        field
+      );
+
+    setErrors(
+      (current) => ({
+        ...current,
+        [errorField]:
+          undefined,
+      })
+    );
 
     setGeneralError("");
   };
 
-  const clearAmountError = (): void => {
-    setErrors((current) => ({
-      ...current,
-      amount: undefined,
-      currency: undefined,
-    }));
+  const clearAmountError =
+    (): void => {
+      setErrors(
+        (current) => ({
+          ...current,
+          amount: undefined,
+          currency: undefined,
+        })
+      );
 
-    setGeneralError("");
-  };
+      setGeneralError("");
+    };
 
-  /*
+  /**
    * Réinitialise le montant lorsque
-   * le donateur change de devise.
+   * la devise change.
    */
   const handleCurrencyChange = (
-    nextCurrency: DonationCurrency
+    nextCurrency:
+      DonationCurrency
   ): void => {
     if (
       submitting ||
@@ -242,19 +427,25 @@ export default function DonationForm() {
       return;
     }
 
-    setCurrency(nextCurrency);
+    setCurrency(
+      nextCurrency
+    );
 
     setSelectedAmount(
-      getDefaultAmount(nextCurrency)
+      getDefaultAmount(
+        nextCurrency
+      )
     );
 
     setCustomAmount("");
 
-    setErrors((current) => ({
-      ...current,
-      amount: undefined,
-      currency: undefined,
-    }));
+    setErrors(
+      (current) => ({
+        ...current,
+        amount: undefined,
+        currency: undefined,
+      })
+    );
 
     setGeneralError("");
   };
@@ -262,6 +453,10 @@ export default function DonationForm() {
   const handleCustomAmountChange = (
     value: string
   ): void => {
+    if (submitting) {
+      return;
+    }
+
     const sanitizedValue =
       value
         .replace(/\D/g, "")
@@ -283,115 +478,178 @@ export default function DonationForm() {
     clearAmountError();
   };
 
-  /*
-   * Validation dans le navigateur.
-   *
-   * La même validation est répétée côté serveur.
-   */
-  const validateForm = (): boolean => {
-    let nextErrors:
-      DonationFieldErrors = {};
-
-    const firstName =
-      donor.firstName.trim();
-
-    const lastName =
-      donor.lastName.trim();
-
-    const email =
-      donor.email
-        .trim()
-        .toLowerCase();
-
-    const phone =
-      donor.phone.trim();
-
-    if (firstName.length < 2) {
-      nextErrors = {
-        ...nextErrors,
-        firstName: isFrench
-          ? "Veuillez saisir votre prénom."
-          : "Please enter your first name.",
-      };
+  const handlePaymentMethodChange = (
+    method:
+      DonationPaymentMethod
+  ): void => {
+    if (submitting) {
+      return;
     }
 
-    if (lastName.length < 2) {
-      nextErrors = {
-        ...nextErrors,
-        lastName: isFrench
-          ? "Veuillez saisir votre nom."
-          : "Please enter your last name.",
-      };
-    }
-
-    if (
-      email.length === 0 ||
-      email.length >
-        MAX_EMAIL_LENGTH ||
-      !EMAIL_PATTERN.test(email)
-    ) {
-      nextErrors = {
-        ...nextErrors,
-        email: isFrench
-          ? "Veuillez saisir une adresse email valide."
-          : "Please enter a valid email address.",
-      };
-    }
-
-    if (
-      phone.length >
-      MAX_PHONE_LENGTH
-    ) {
-      nextErrors = {
-        ...nextErrors,
-        phone: isFrench
-          ? "Le numéro de téléphone est trop long."
-          : "The telephone number is too long.",
-      };
-    }
-
-    if (!amountIsValid) {
-      const formattedMinimum =
-        formatDonationAmount(
-          currencyLimits.minimum,
-          language,
-          currency
-        );
-
-      const formattedMaximum =
-        formatDonationAmount(
-          currencyLimits.maximum,
-          language,
-          currency
-        );
-
-      nextErrors = {
-        ...nextErrors,
-        amount: isFrench
-          ? `Le montant doit être compris entre ${formattedMinimum} et ${formattedMaximum}.`
-          : `The amount must be between ${formattedMinimum} and ${formattedMaximum}.`,
-      };
-    }
-
-    if (!donor.consent) {
-      nextErrors = {
-        ...nextErrors,
-        consent: isFrench
-          ? "Votre accord est nécessaire pour continuer."
-          : "Your consent is required to continue.",
-      };
-    }
-
-    setErrors(nextErrors);
-
-    return (
-      Object.keys(nextErrors).length ===
-      0
+    setPaymentMethod(
+      method
     );
+
+    setPaymentMethodError("");
+    setGeneralError("");
   };
 
+  /**
+   * Validation exécutée dans le navigateur.
+   *
+   * Cette validation améliore l’expérience
+   * utilisateur, mais ne remplace jamais
+   * la validation côté serveur.
+   */
+  const validateForm =
+    (): boolean => {
+      const nextErrors:
+        Partial<
+          Record<
+            keyof DonationFieldErrors,
+            string
+          >
+        > = {};
+
+      let nextPaymentMethodError =
+        "";
+
+      const firstName =
+        donor.firstName
+          .normalize("NFKC")
+          .trim();
+
+      const lastName =
+        donor.lastName
+          .normalize("NFKC")
+          .trim();
+
+      const email =
+        donor.email
+          .normalize("NFKC")
+          .trim()
+          .toLowerCase();
+
+      const phone =
+        donor.phone
+          .normalize("NFKC")
+          .trim();
+
+      const country =
+        donor.country
+          .normalize("NFKC")
+          .trim();
+
+      if (
+        firstName.length < 2 ||
+        firstName.length >
+          MAX_FIRST_NAME_LENGTH
+      ) {
+        nextErrors.firstName =
+          isFrench
+            ? "Veuillez saisir un prénom valide."
+            : "Please enter a valid first name.";
+      }
+
+      if (
+        lastName.length < 2 ||
+        lastName.length >
+          MAX_LAST_NAME_LENGTH
+      ) {
+        nextErrors.lastName =
+          isFrench
+            ? "Veuillez saisir un nom valide."
+            : "Please enter a valid last name.";
+      }
+
+      if (
+        email.length === 0 ||
+        email.length >
+          MAX_EMAIL_LENGTH ||
+        !EMAIL_PATTERN.test(email)
+      ) {
+        nextErrors.email =
+          isFrench
+            ? "Veuillez saisir une adresse e-mail valide."
+            : "Please enter a valid email address.";
+      }
+
+      if (
+        !isValidOptionalPhone(
+          phone
+        )
+      ) {
+        nextErrors.phone =
+          isFrench
+            ? "Veuillez saisir un numéro de téléphone valide."
+            : "Please enter a valid telephone number.";
+      }
+
+      if (
+        country.length >
+        MAX_COUNTRY_LENGTH
+      ) {
+        nextErrors.country =
+          isFrench
+            ? "Le nom du pays est trop long."
+            : "The country name is too long.";
+      }
+
+      if (!amountIsValid) {
+        const formattedMinimum =
+          formatDonationAmount(
+            currencyLimits.minimum,
+            language,
+            currency
+          );
+
+        const formattedMaximum =
+          formatDonationAmount(
+            currencyLimits.maximum,
+            language,
+            currency
+          );
+
+        nextErrors.amount =
+          isFrench
+            ? `Le montant doit être compris entre ${formattedMinimum} et ${formattedMaximum}.`
+            : `The amount must be between ${formattedMinimum} and ${formattedMaximum}.`;
+      }
+
+      if (!paymentMethod) {
+        nextPaymentMethodError =
+          isFrench
+            ? "Veuillez sélectionner un moyen de paiement."
+            : "Please select a payment method.";
+      }
+
+      if (!donor.consent) {
+        nextErrors.consent =
+          isFrench
+            ? "Votre accord est nécessaire pour continuer."
+            : "Your consent is required to continue.";
+      }
+
+      setErrors(
+        nextErrors
+      );
+
+      setPaymentMethodError(
+        nextPaymentMethodError
+      );
+
+      return (
+        Object.keys(
+          nextErrors
+        ).length === 0 &&
+        nextPaymentMethodError.length ===
+          0
+      );
+    };
+
   const handleSubmit = async (
-    event: FormEvent<HTMLFormElement>
+    event:
+      FormEvent<HTMLFormElement>
   ): Promise<void> => {
     event.preventDefault();
 
@@ -401,8 +659,8 @@ export default function DonationForm() {
 
     setGeneralError("");
 
-    /*
-     * Si un robot remplit ce champ invisible,
+    /**
+     * Si un robot remplit le honeypot,
      * aucune requête n’est envoyée.
      */
     if (
@@ -415,62 +673,92 @@ export default function DonationForm() {
       return;
     }
 
+    /**
+     * Cette vérification garantit également
+     * le type de paymentMethod.
+     */
+    if (!paymentMethod) {
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const response = await fetch(
-        "/api/donations/checkout",
-        {
-          method: "POST",
+      const response =
+        await fetch(
+          "/api/donations/checkout",
+          {
+            method: "POST",
 
-          headers: {
-            "Content-Type":
-              "application/json",
-            Accept: "application/json",
-          },
+            headers: {
+              "Content-Type":
+                "application/json",
 
-          credentials: "same-origin",
-          cache: "no-store",
-
-          body: JSON.stringify({
-            frequency,
-            amount: finalAmount,
-            currency,
-            allocation,
-
-            donor: {
-              firstName:
-                donor.firstName.trim(),
-
-              lastName:
-                donor.lastName.trim(),
-
-              email:
-                donor.email
-                  .trim()
-                  .toLowerCase(),
-
-              phone:
-                donor.phone.trim() ||
-                null,
-
-              country:
-                donor.country.trim() ||
-                null,
-
-              anonymous:
-                donor.anonymous,
-
-              consent:
-                donor.consent,
+              Accept:
+                "application/json",
             },
-          }),
-        }
-      );
+
+            credentials:
+              "same-origin",
+
+            cache:
+              "no-store",
+
+            body:
+              JSON.stringify({
+                frequency,
+
+                amount:
+                  finalAmount,
+
+                currency,
+
+                allocation,
+
+                paymentMethod,
+
+                donor: {
+                  firstName:
+                    donor.firstName
+                      .normalize("NFKC")
+                      .trim(),
+
+                  lastName:
+                    donor.lastName
+                      .normalize("NFKC")
+                      .trim(),
+
+                  email:
+                    donor.email
+                      .normalize("NFKC")
+                      .trim()
+                      .toLowerCase(),
+
+                  phone:
+                    donor.phone
+                      .normalize("NFKC")
+                      .trim() ||
+                    null,
+
+                  country:
+                    donor.country
+                      .normalize("NFKC")
+                      .trim() ||
+                    null,
+
+                  anonymous:
+                    donor.anonymous,
+
+                  consent:
+                    donor.consent,
+                },
+              }),
+          }
+        );
 
       let result:
-        | DonationCheckoutResponse
-        | null = null;
+        DonationCheckoutResponse | null =
+        null;
 
       try {
         result =
@@ -494,7 +782,9 @@ export default function DonationForm() {
       if (
         !response.ok ||
         result?.success !== true ||
-        !result.checkoutUrl
+        typeof result.checkoutUrl !==
+          "string" ||
+        result.checkoutUrl.length === 0
       ) {
         throw new Error(
           result?.error ??
@@ -516,7 +806,27 @@ export default function DonationForm() {
       window.location.assign(
         redirectUrl.href
       );
-    } catch {
+    } catch (error: unknown) {
+      const errorCode =
+        getSafeErrorCode(
+          error
+        );
+
+      /**
+       * console.warn permet de conserver une trace
+       * en développement sans déclencher l’overlay
+       * rouge provoqué par console.error.
+       */
+      if (
+        process.env.NODE_ENV !==
+        "production"
+      ) {
+        console.warn(
+          "Donation checkout failed:",
+          errorCode
+        );
+      }
+
       setGeneralError(
         isFrench
           ? "Le paiement n’a pas pu être préparé. Vérifiez les informations saisies, puis réessayez."
@@ -554,8 +864,8 @@ export default function DonationForm() {
 
             <span className="text-[#0097a7]">
               {isFrench
-                ? "don sécurisé"
-                : "secure donation"}
+                ? "don"
+                : "donation"}
             </span>
           </h2>
 
@@ -577,7 +887,9 @@ export default function DonationForm() {
             id="donation-form"
             noValidate
             onSubmit={(event) => {
-              void handleSubmit(event);
+              void handleSubmit(
+                event
+              );
             }}
             className={[
               "relative space-y-8",
@@ -596,7 +908,9 @@ export default function DonationForm() {
                 "overflow-hidden",
               ].join(" ")}
             >
-              <label htmlFor="donation-website">
+              <label
+                htmlFor="donation-website"
+              >
                 Website
               </label>
 
@@ -619,6 +933,10 @@ export default function DonationForm() {
             <DonationFrequencySelector
               value={frequency}
               onChange={(value) => {
+                if (submitting) {
+                  return;
+                }
+
                 setFrequency(value);
                 setGeneralError("");
               }}
@@ -634,14 +952,14 @@ export default function DonationForm() {
                 disabled={submitting}
               />
 
-              {errors.currency && (
+              {errors.currency ? (
                 <p
                   role="alert"
                   className="mt-3 text-sm font-bold text-red-700"
                 >
                   {errors.currency}
                 </p>
-              )}
+              ) : null}
             </div>
 
             <div className="border-t border-[#e5ebec] pt-8">
@@ -658,6 +976,10 @@ export default function DonationForm() {
                 onSelectAmount={(
                   amount
                 ) => {
+                  if (submitting) {
+                    return;
+                  }
+
                   setSelectedAmount(
                     amount
                   );
@@ -675,6 +997,10 @@ export default function DonationForm() {
               <DonationAllocationSelector
                 value={allocation}
                 onChange={(value) => {
+                  if (submitting) {
+                    return;
+                  }
+
                   setAllocation(value);
 
                   setErrors(
@@ -689,6 +1015,36 @@ export default function DonationForm() {
                 }}
                 disabled={submitting}
               />
+
+              {errors.allocation ? (
+                <p
+                  role="alert"
+                  className="mt-3 text-sm font-bold text-red-700"
+                >
+                  {errors.allocation}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="border-t border-[#e5ebec] pt-8">
+              <DonationPaymentMethods
+                value={paymentMethod}
+                onChange={
+                  handlePaymentMethodChange
+                }
+                disabled={submitting}
+                error={
+                  paymentMethodError ||
+                  null
+                }
+                language={
+                  isFrench
+                    ? "fr"
+                    : "en"
+                }
+                name="paymentMethod"
+                required
+              />
             </div>
 
             <div className="border-t border-[#e5ebec] pt-8">
@@ -700,7 +1056,7 @@ export default function DonationForm() {
               />
             </div>
 
-            {generalError.length > 0 && (
+            {generalError.length > 0 ? (
               <div
                 role="alert"
                 aria-live="assertive"
@@ -719,9 +1075,11 @@ export default function DonationForm() {
                   className="mt-0.5 shrink-0"
                 />
 
-                <p>{generalError}</p>
+                <p>
+                  {generalError}
+                </p>
               </div>
-            )}
+            ) : null}
           </form>
 
           <DonationSummary
@@ -730,13 +1088,12 @@ export default function DonationForm() {
             currency={currency}
             allocation={allocation}
             submitting={submitting}
+            paymentMethod={
+              paymentMethod
+            }
           />
         </div>
 
-        {/*
-         * Réserve de l’espace afin que le bouton fixe
-         * ne masque pas le bas du contenu.
-         */}
         <div
           aria-hidden="true"
           className="h-40 lg:h-28"
@@ -747,7 +1104,9 @@ export default function DonationForm() {
         amount={finalAmount}
         currency={currency}
         submitting={submitting}
-        disabled={!amountIsValid}
+        disabled={
+          !formCanBeSubmitted
+        }
         formId="donation-form"
       />
     </section>

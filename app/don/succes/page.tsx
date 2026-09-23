@@ -1,39 +1,91 @@
+import "server-only";
+
 import type {
   Metadata,
 } from "next";
+
 import Link from "next/link";
+
 import {
   CheckCircle2,
   CircleAlert,
   Clock3,
   Heart,
   Home,
-  ShieldCheck,
+  Info,
+  RotateCcw,
 } from "lucide-react";
 
 import {
   formatDonationAmount,
 } from "@/data/donation";
+
 import {
+  DonationPaymentStoreError,
+  donationPaymentStore,
+} from "@/lib/donation/payment-store";
+
+import {
+  hasRegisteredPaymentProvider,
   PaymentConfigurationError,
   PaymentProviderError,
+  registerPaymentProvider,
   verifyPayment,
 } from "@/lib/donation/payment-provider";
+
 import {
   normalizeDonationReference,
 } from "@/lib/donation/payment-reference";
+
+import {
+  monerooPaymentProvider,
+} from "@/lib/donation/providers/moneroo-provider";
+
 import type {
   DonationCurrency,
+  DonationPaymentRecord,
+  DonationPaymentStatus,
+  PaymentVerificationResult,
 } from "@/types/donation";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+/**
+ * ============================================================================
+ * YOUNG CARING
+ * PAGE DE RETOUR APRÈS PAIEMENT
+ * ============================================================================
+ *
+ * Cette page :
+ *
+ * - accepte uniquement une référence interne Young Caring ;
+ * - retrouve le paiement attendu dans PostgreSQL ;
+ * - n’utilise jamais une référence Moneroo reçue du navigateur ;
+ * - vérifie la transaction directement auprès de Moneroo ;
+ * - compare le prestataire, les références, le montant et la devise ;
+ * - met à jour le stockage durable après vérification ;
+ * - ne confirme jamais un don grâce à une simple redirection ;
+ * - ne retourne aucune information personnelle du donateur.
+ *
+ * Le reçu PDF et l’e-mail de confirmation doivent être déclenchés
+ * séparément par un service idempotent après le statut paid.
+ * ============================================================================
+ */
 
-export const metadata: Metadata = {
-  title: "Vérification du don",
+export const runtime =
+  "nodejs";
+
+export const dynamic =
+  "force-dynamic";
+
+export const revalidate =
+  0;
+
+export const metadata:
+  Metadata = {
+  title:
+    "Vérification du don",
 
   description:
-    "Vérification sécurisée du statut de votre contribution à Young Caring.",
+    "Consultation du statut de votre contribution à Young Caring.",
 
   robots: {
     index: false,
@@ -43,10 +95,24 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * L’adaptateur doit être enregistré dans
+ * le processus exécutant cette page.
+ */
+if (
+  !hasRegisteredPaymentProvider(
+    "moneroo"
+  )
+) {
+  registerPaymentProvider(
+    monerooPaymentProvider
+  );
+}
+
 type SearchParameter =
-  string |
-  string[] |
-  undefined;
+  | string
+  | string[]
+  | undefined;
 
 type DonationSuccessPageProps =
   Readonly<{
@@ -58,18 +124,32 @@ type DonationSuccessPageProps =
     >;
   }>;
 
+type PublicVerificationStatus =
+  | "paid"
+  | "pending"
+  | "failed"
+  | "cancelled"
+  | "expired"
+  | "refunded"
+  | "invalid";
+
 type VerificationState =
   | Readonly<{
       status: "paid";
       reference: string;
       amount: number;
-      currency: DonationCurrency;
+      currency:
+        DonationCurrency;
     }>
   | Readonly<{
-      status: "pending";
+      status: Exclude<
+        PublicVerificationStatus,
+        "paid" | "invalid"
+      >;
       reference: string;
-      amount: null;
-      currency: null;
+      amount: number;
+      currency:
+        DonationCurrency;
     }>
   | Readonly<{
       status: "invalid";
@@ -78,16 +158,18 @@ type VerificationState =
       currency: null;
     }>;
 
-/*
+/**
  * Accepte uniquement un paramètre unique.
  *
- * Lorsqu’un même paramètre apparaît plusieurs fois,
- * la requête est considérée comme ambiguë et refusée.
+ * Plusieurs occurrences du même paramètre
+ * rendent la demande ambiguë.
  */
 function getSingleSearchParameter(
   value: SearchParameter
 ): string | null {
-  if (typeof value === "string") {
+  if (
+    typeof value === "string"
+  ) {
     return value;
   }
 
@@ -102,43 +184,134 @@ function getSingleSearchParameter(
   return null;
 }
 
-/*
- * Nettoie la référence externe avant
- * de la transmettre au prestataire.
+/**
+ * Transforme un statut interne en statut
+ * utilisable par la page publique.
  */
-function normalizeProviderReference(
-  value: string | null
-): string | null {
-  if (!value) {
-    return null;
+function normalizePublicStatus(
+  status:
+    DonationPaymentStatus
+): Exclude<
+  PublicVerificationStatus,
+  "invalid"
+> {
+  switch (status) {
+    case "paid":
+      return "paid";
+
+    case "failed":
+      return "failed";
+
+    case "cancelled":
+      return "cancelled";
+
+    case "expired":
+      return "expired";
+
+    case "refunded":
+      return "refunded";
+
+    case "pending":
+    case "processing":
+    default:
+      return "pending";
   }
-
-  const normalized =
-    value.trim();
-
-  if (
-    normalized.length < 3 ||
-    normalized.length > 200 ||
-    !/^[A-Za-z0-9._:-]+$/.test(
-      normalized
-    )
-  ) {
-    return null;
-  }
-
-  return normalized;
 }
 
-/*
- * Vérifie le paiement directement
- * auprès du prestataire configuré.
- *
- * Une redirection vers cette page ne suffit
- * jamais à confirmer une contribution.
+/**
+ * Transforme un paiement enregistré
+ * en résultat public.
+ */
+function createStateFromPayment(
+  payment:
+    DonationPaymentRecord
+): VerificationState {
+  const status =
+    normalizePublicStatus(
+      payment.status
+    );
+
+  return {
+    status,
+    reference:
+      payment.reference,
+    amount:
+      payment.amount,
+    currency:
+      payment.currency,
+  };
+}
+
+/**
+ * Vérifie que le résultat retourné par Moneroo
+ * appartient exactement au paiement enregistré.
+ */
+function paymentMatchesStoredRecord(
+  storedPayment:
+    DonationPaymentRecord,
+  verifiedPayment:
+    PaymentVerificationResult
+): boolean {
+  return (
+    verifiedPayment.provider ===
+      storedPayment.provider &&
+    verifiedPayment.reference ===
+      storedPayment.reference &&
+    verifiedPayment
+      .providerReference !==
+      null &&
+    verifiedPayment
+      .providerReference ===
+      storedPayment
+        .providerReference &&
+    verifiedPayment.amount ===
+      storedPayment.amount &&
+    verifiedPayment.currency ===
+      storedPayment.currency
+  );
+}
+
+/**
+ * Empêche la dégradation d’un statut déjà finalisé.
+ */
+function resolveNextStatus(
+  currentStatus:
+    DonationPaymentStatus,
+  verifiedStatus:
+    DonationPaymentStatus
+): DonationPaymentStatus {
+  if (
+    currentStatus === "paid"
+  ) {
+    return verifiedStatus ===
+      "refunded"
+      ? "refunded"
+      : "paid";
+  }
+
+  if (
+    currentStatus ===
+      "refunded" ||
+    currentStatus ===
+      "failed" ||
+    currentStatus ===
+      "cancelled" ||
+    currentStatus ===
+      "expired"
+  ) {
+    return currentStatus;
+  }
+
+  return verifiedStatus;
+}
+
+/**
+ * Vérifie le paiement en utilisant uniquement
+ * les données déjà enregistrées côté serveur.
  */
 async function verifyDonation(
-  internalReference: string | null,
-  providerReference: string | null
+  internalReference:
+    string | null
 ): Promise<VerificationState> {
   const reference =
     normalizeDonationReference(
@@ -154,78 +327,272 @@ async function verifyDonation(
     };
   }
 
-  /*
-   * Sans référence externe, aucune vérification
-   * ne peut être demandée au prestataire.
-   */
-  if (!providerReference) {
-    return {
-      status: "pending",
-      reference,
-      amount: null,
-      currency: null,
-    };
-  }
-
   try {
-    const payment =
-      await verifyPayment(
-        providerReference
-      );
+    const storedPayment =
+      await donationPaymentStore
+        .findByReference(
+          reference
+        );
 
-    /*
-     * Le paiement n’est confirmé que si :
-     * - le prestataire indique paid ;
-     * - la référence interne correspond ;
-     * - le montant est un entier positif ;
-     * - la devise a été validée par la couche
-     *   payment-provider.
-     */
-    if (
-      payment.status === "paid" &&
-      payment.reference === reference &&
-      Number.isSafeInteger(
-        payment.amount
-      ) &&
-      payment.amount > 0
-    ) {
+    if (!storedPayment) {
       return {
-        status: "paid",
-        reference,
-        amount: payment.amount,
-        currency: payment.currency,
+        status: "invalid",
+        reference: null,
+        amount: null,
+        currency: null,
       };
     }
 
-    return {
-      status: "pending",
-      reference,
-      amount: null,
-      currency: null,
-    };
-  } catch (error: unknown) {
+    /**
+     * Un paiement déjà confirmé peut être affiché
+     * directement depuis le stockage durable.
+     *
+     * Sa confirmation a déjà été obtenue côté serveur.
+     */
     if (
-      error instanceof
-        PaymentConfigurationError ||
-      error instanceof
-        PaymentProviderError
+      storedPayment.status ===
+        "paid" ||
+      storedPayment.status ===
+        "refunded"
     ) {
-      console.error(
-        "Donation verification unavailable:",
-        error.code
-      );
-    } else {
-      console.error(
-        "Unexpected donation verification error."
+      return createStateFromPayment(
+        storedPayment
       );
     }
 
+    /**
+     * Sans référence prestataire enregistrée,
+     * la vérification externe n’est pas possible.
+     */
+    if (
+      !storedPayment
+        .providerReference
+    ) {
+      return createStateFromPayment(
+        storedPayment
+      );
+    }
+
+    let verifiedPayment:
+      PaymentVerificationResult;
+
+    try {
+      verifiedPayment =
+        await verifyPayment(
+          storedPayment
+            .providerReference
+        );
+    } catch (error: unknown) {
+      if (
+        error instanceof
+          PaymentConfigurationError ||
+        error instanceof
+          PaymentProviderError
+      ) {
+        console.error(
+          "Donation verification unavailable:",
+          {
+            code:
+              error.code,
+          }
+        );
+      } else {
+        console.error(
+          "Unexpected donation provider verification error:",
+          {
+            name:
+              error instanceof Error
+                ? error.name
+                : "UnknownError",
+          }
+        );
+      }
+
+      /**
+       * En cas d’indisponibilité de Moneroo,
+       * le statut connu en base reste la référence.
+       */
+      return createStateFromPayment(
+        storedPayment
+      );
+    }
+
+    if (
+      !paymentMatchesStoredRecord(
+        storedPayment,
+        verifiedPayment
+      )
+    ) {
+      console.error(
+        "Donation verification mismatch:",
+        {
+          reference:
+            storedPayment.reference,
+        }
+      );
+
+      return createStateFromPayment(
+        storedPayment
+      );
+    }
+
+    const nextStatus =
+      resolveNextStatus(
+        storedPayment.status,
+        verifiedPayment.status
+      );
+
+    if (
+      nextStatus ===
+      storedPayment.status
+    ) {
+      return createStateFromPayment(
+        storedPayment
+      );
+    }
+
+    const updatedPayment =
+      await donationPaymentStore
+        .updateByReference(
+          storedPayment.reference,
+          {
+            status:
+              nextStatus,
+          }
+        );
+
+    return createStateFromPayment(
+      updatedPayment
+    );
+  } catch (error: unknown) {
+    if (
+      error instanceof
+      DonationPaymentStoreError
+    ) {
+      console.error(
+        "Donation storage verification error:",
+        {
+          code:
+            error.code,
+        }
+      );
+    } else {
+      console.error(
+        "Unexpected donation verification error:",
+        {
+          name:
+            error instanceof Error
+              ? error.name
+              : "UnknownError",
+        }
+      );
+    }
+
+    /**
+     * Une erreur technique ne doit jamais
+     * produire une fausse confirmation.
+     */
     return {
       status: "pending",
       reference,
-      amount: null,
-      currency: null,
+      amount: 0,
+      currency: "XOF",
     };
+  }
+}
+
+/**
+ * Contenu public correspondant à chaque statut.
+ */
+function getStatusContent(
+  status:
+    PublicVerificationStatus
+) {
+  switch (status) {
+    case "paid":
+      return {
+        title:
+          "Votre don est confirmé",
+
+        description:
+          "Merci pour votre générosité. Votre contribution a été confirmée après vérification du paiement.",
+
+        detail:
+          "Paiement confirmé",
+      };
+
+    case "failed":
+      return {
+        title:
+          "Le paiement a échoué",
+
+        description:
+          "Le prestataire n’a pas confirmé le paiement. Aucun don n’a été enregistré comme payé.",
+
+        detail:
+          "Paiement échoué",
+      };
+
+    case "cancelled":
+      return {
+        title:
+          "Paiement annulé",
+
+        description:
+          "L’opération a été annulée avant sa confirmation. Vous pouvez recommencer lorsque vous le souhaitez.",
+
+        detail:
+          "Paiement annulé",
+      };
+
+    case "expired":
+      return {
+        title:
+          "Session expirée",
+
+        description:
+          "La session de paiement a expiré avant sa confirmation. Vous pouvez créer une nouvelle contribution.",
+
+        detail:
+          "Session expirée",
+      };
+
+    case "refunded":
+      return {
+        title:
+          "Paiement remboursé",
+
+        description:
+          "Cette transaction a été marquée comme remboursée après sa confirmation initiale.",
+
+        detail:
+          "Paiement remboursé",
+      };
+
+    case "invalid":
+      return {
+        title:
+          "Référence invalide",
+
+        description:
+          "Cette adresse ne contient pas une référence de don valide. Aucun paiement ne peut être confirmé depuis cette page.",
+
+        detail:
+          null,
+      };
+
+    case "pending":
+    default:
+      return {
+        title:
+          "Vérification en cours",
+
+        description:
+          "Votre retour depuis la page de paiement a bien été reçu. La contribution sera confirmée uniquement après vérification côté serveur.",
+
+        detail:
+          "Confirmation en attente",
+      };
   }
 }
 
@@ -240,33 +607,51 @@ export default async function DonationSuccessPage({
       parameters.reference
     );
 
-  const providerReference =
-    normalizeProviderReference(
-      getSingleSearchParameter(
-        parameters.providerReference
-      )
-    );
-
+  /**
+   * providerReference venant de l’URL est
+   * volontairement ignorée.
+   */
   const verification =
     await verifyDonation(
-      internalReference,
-      providerReference
+      internalReference
     );
 
+  const status =
+    verification.status;
+
   const confirmed =
-    verification.status === "paid";
+    status === "paid";
 
   const invalid =
-    verification.status === "invalid";
+    status === "invalid";
 
-  const confirmedAmount =
-    confirmed
+  const pending =
+    status === "pending";
+
+  const content =
+    getStatusContent(
+      status
+    );
+
+  const formattedAmount =
+    !invalid &&
+    verification.amount > 0
       ? formatDonationAmount(
           verification.amount,
           "fr",
           verification.currency
         )
       : null;
+
+  const statusColorClass =
+    confirmed
+      ? "bg-[#e7f8ee] text-[#167340]"
+      : invalid ||
+          status === "failed"
+        ? "bg-red-50 text-red-700"
+        : status === "refunded"
+          ? "bg-[#eef0ff] text-[#4f46a5]"
+          : "bg-[#fff4e9] text-[#d85c12]";
 
   return (
     <section
@@ -298,7 +683,8 @@ export default async function DonationSuccessPage({
               "h-48 w-48 rounded-full",
               confirmed
                 ? "bg-green-500/[0.07]"
-                : invalid
+                : invalid ||
+                    status === "failed"
                   ? "bg-red-500/[0.06]"
                   : "bg-[#f36c16]/[0.07]",
               "blur-3xl",
@@ -312,11 +698,7 @@ export default async function DonationSuccessPage({
                 "place-items-center",
                 "rounded-full",
                 "shadow-[0_10px_28px_rgba(7,31,33,0.08)]",
-                confirmed
-                  ? "bg-[#e7f8ee] text-[#167340]"
-                  : invalid
-                    ? "bg-red-50 text-red-700"
-                    : "bg-[#fff4e9] text-[#d85c12]",
+                statusColorClass,
               ].join(" ")}
             >
               {confirmed ? (
@@ -325,14 +707,21 @@ export default async function DonationSuccessPage({
                   size={38}
                   strokeWidth={2.2}
                 />
-              ) : invalid ? (
+              ) : invalid ||
+                status === "failed" ? (
                 <CircleAlert
                   aria-hidden="true"
                   size={36}
                   strokeWidth={2.2}
                 />
-              ) : (
+              ) : pending ? (
                 <Clock3
+                  aria-hidden="true"
+                  size={36}
+                  strokeWidth={2.2}
+                />
+              ) : (
+                <RotateCcw
                   aria-hidden="true"
                   size={36}
                   strokeWidth={2.2}
@@ -354,22 +743,14 @@ export default async function DonationSuccessPage({
                 "sm:text-4xl",
               ].join(" ")}
             >
-              {confirmed
-                ? "Votre don est confirmé"
-                : invalid
-                  ? "Référence invalide"
-                  : "Vérification en cours"}
+              {content.title}
             </h1>
 
             <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-[#5f6d70]">
-              {confirmed
-                ? "Merci pour votre générosité. Votre contribution a été vérifiée directement auprès du prestataire de paiement."
-                : invalid
-                  ? "Cette adresse ne contient pas une référence de don valide. Aucun paiement ne peut être confirmé depuis cette page."
-                  : "Votre retour depuis la page de paiement a bien été reçu. La contribution ne sera confirmée qu’après sa vérification sécurisée auprès du prestataire."}
+              {content.description}
             </p>
 
-            {verification.reference && (
+            {verification.reference ? (
               <div
                 className={[
                   "mt-7 rounded-[22px]",
@@ -385,58 +766,87 @@ export default async function DonationSuccessPage({
                   {verification.reference}
                 </p>
 
-                {confirmed &&
-                  confirmedAmount && (
-                    <>
-                      <div className="my-5 h-px bg-[#dce5e6]" />
+                {formattedAmount ? (
+                  <>
+                    <div className="my-5 h-px bg-[#dce5e6]" />
 
-                      <p className="text-xs font-black uppercase tracking-[0.08em] text-[#647275]">
-                        Montant confirmé
-                      </p>
+                    <p className="text-xs font-black uppercase tracking-[0.08em] text-[#647275]">
+                      {confirmed
+                        ? "Montant confirmé"
+                        : "Montant du don"}
+                    </p>
 
-                      <p
-                        className={[
-                          "mt-2 break-words",
-                          "text-3xl font-black",
-                          "tracking-[-0.035em]",
-                          "text-[#0097a7]",
-                        ].join(" ")}
-                      >
-                        {confirmedAmount}
-                      </p>
+                    <p
+                      className={[
+                        "mt-2 break-words",
+                        "text-3xl font-black",
+                        "tracking-[-0.035em]",
+                        confirmed
+                          ? "text-[#0097a7]"
+                          : "text-[#48575a]",
+                      ].join(" ")}
+                    >
+                      {formattedAmount}
+                    </p>
 
-                      <span
-                        className={[
-                          "mt-3 inline-flex",
-                          "rounded-full",
-                          "bg-[#e1f5f6]",
-                          "px-3 py-1",
-                          "text-xs font-extrabold",
-                          "text-[#007d88]",
-                        ].join(" ")}
-                      >
-                        {verification.currency}
-                      </span>
-                    </>
-                  )}
+                    <span
+                      className={[
+                        "mt-3 inline-flex",
+                        "rounded-full",
+                        "bg-[#e1f5f6]",
+                        "px-3 py-1",
+                        "text-xs font-extrabold",
+                        "text-[#007d88]",
+                      ].join(" ")}
+                    >
+                      {verification.currency}
+                    </span>
+                  </>
+                ) : null}
 
-                {!confirmed &&
-                  !invalid && (
-                    <>
-                      <div className="my-5 h-px bg-[#dce5e6]" />
+                {content.detail ? (
+                  <>
+                    <div className="my-5 h-px bg-[#dce5e6]" />
 
-                      <p className="inline-flex items-center gap-2 text-sm font-bold text-[#b95313]">
+                    <p
+                      className={[
+                        "inline-flex items-center",
+                        "justify-center gap-2",
+                        "text-sm font-bold",
+                        confirmed
+                          ? "text-[#167340]"
+                          : invalid ||
+                              status ===
+                                "failed"
+                            ? "text-red-700"
+                            : "text-[#b95313]",
+                      ].join(" ")}
+                    >
+                      {confirmed ? (
+                        <CheckCircle2
+                          aria-hidden="true"
+                          size={17}
+                        />
+                      ) : invalid ||
+                        status ===
+                          "failed" ? (
+                        <CircleAlert
+                          aria-hidden="true"
+                          size={17}
+                        />
+                      ) : (
                         <Clock3
                           aria-hidden="true"
                           size={17}
                         />
+                      )}
 
-                        Confirmation en attente
-                      </p>
-                    </>
-                  )}
+                      {content.detail}
+                    </p>
+                  </>
+                ) : null}
               </div>
-            )}
+            ) : null}
 
             <div
               className={[
@@ -448,7 +858,7 @@ export default async function DonationSuccessPage({
                 "leading-6 text-[#315d62]",
               ].join(" ")}
             >
-              <ShieldCheck
+              <Info
                 aria-hidden="true"
                 size={20}
                 className="mt-0.5 shrink-0"
@@ -458,7 +868,7 @@ export default async function DonationSuccessPage({
                 Young Caring ne vous demandera
                 jamais votre numéro de carte,
                 votre code secret ou votre mot
-                de passe par email, téléphone
+                de passe par e-mail, téléphone
                 ou messagerie.
               </p>
             </div>
@@ -476,17 +886,31 @@ export default async function DonationSuccessPage({
                 Retour à l’accueil
               </Link>
 
-              <Link
-                href="/actions"
-                className="button-primary"
-              >
-                <Heart
-                  aria-hidden="true"
-                  size={18}
-                />
+              {confirmed ? (
+                <Link
+                  href="/actions"
+                  className="button-primary"
+                >
+                  <Heart
+                    aria-hidden="true"
+                    size={18}
+                  />
 
-                Découvrir nos actions
-              </Link>
+                  Découvrir nos actions
+                </Link>
+              ) : (
+                <Link
+                  href="/don"
+                  className="button-primary"
+                >
+                  <RotateCcw
+                    aria-hidden="true"
+                    size={18}
+                  />
+
+                  Retour à la page de don
+                </Link>
+              )}
             </div>
           </div>
         </div>
