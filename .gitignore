@@ -86,4 +86,5 @@ next-env.d.ts
 .turbo/
 
 # Local development tools
-*.local
+*.local.env*.backup*
+*.backup-*
