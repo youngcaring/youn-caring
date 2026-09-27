@@ -19,6 +19,11 @@ import {
 } from "@/lib/donation/payment-reference";
 
 import {
+  DonationPaymentStoreError,
+  donationPaymentStore,
+} from "@/lib/donation/payment-store";
+
+import {
   monerooPaymentProvider,
 } from "@/lib/donation/providers/moneroo-provider";
 
@@ -876,12 +881,73 @@ export async function POST(
   );
 
   try {
+    const donation =
+      validation.data;
+
+    const donor =
+      donation.donor;
+
+    /**
+     * Le paiement est enregistré AVANT
+     * toute redirection vers Moneroo.
+     *
+     * La base conserve donc les valeurs attendues
+     * utilisées ensuite pour la vérification :
+     *
+     * - référence Young Caring ;
+     * - montant ;
+     * - devise ;
+     * - fréquence ;
+     * - affectation ;
+     * - identité du donateur ;
+     * - statut pending.
+     */
+    await donationPaymentStore.create({
+      reference,
+
+      provider:
+        "moneroo",
+
+      amount:
+        donation.amount,
+
+      currency:
+        donation.currency,
+
+      frequency:
+        donation.frequency,
+
+      allocation:
+        donation.allocation,
+
+      donorFirstName:
+        donor.firstName,
+
+      donorLastName:
+        donor.lastName,
+
+      donorEmail:
+        donor.email,
+
+      donorPhone:
+        donor.phone,
+
+      donorCountry:
+        donor.country,
+
+      anonymous:
+        donor.anonymous,
+    });
+
+    /**
+     * Moneroo n'est appelé qu'après
+     * l'enregistrement local réussi.
+     */
     const paymentSession =
       await createPaymentSession({
         reference,
 
-        donation:
-          validation.data,
+        donation,
 
         successUrl:
           successUrl.toString(),
@@ -889,6 +955,23 @@ export async function POST(
         cancelUrl:
           cancelUrl.toString(),
       });
+
+    /**
+     * L'identifiant réel retourné par Moneroo
+     * est ensuite rattaché au paiement local.
+     *
+     * La page succès et le webhook peuvent alors
+     * vérifier la transaction sans faire confiance
+     * aux paramètres de l'URL du navigateur.
+     */
+    await donationPaymentStore
+      .updateByReference(
+        reference,
+        {
+          providerReference:
+            paymentSession.providerReference,
+        }
+      );
 
     return jsonResponse(
       {
@@ -906,6 +989,32 @@ export async function POST(
      * Aucun secret, jeton ou contenu sensible
      * n’est retourné au navigateur.
      */
+    if (
+      error instanceof
+      DonationPaymentStoreError
+    ) {
+      console.error(
+        "Donation payment storage error:",
+        {
+          code:
+            error.code,
+
+          statusCode:
+            error.statusCode,
+        }
+      );
+
+      return jsonResponse(
+        {
+          success: false,
+
+          error:
+            "PAYMENT_STORAGE_ERROR",
+        },
+        503
+      );
+    }
+
     if (
       error instanceof
       PaymentConfigurationError
