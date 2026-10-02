@@ -18,7 +18,7 @@ export default function ContactLocation() {
       ? {
           label: "Notre localisation",
           titleStart: "Young Caring est présent à",
-          titleHighlight: "Abomey-Calavi",
+          titleHighlight: "Littoral - Commune de Cotonou",
           description:
             "Notre organisation intervient auprès des enfants, des familles et des communautés. Pour organiser une rencontre, contactez-nous avant votre déplacement.",
           country: "Pays",
@@ -31,7 +31,7 @@ export default function ContactLocation() {
       : {
           label: "Our location",
           titleStart: "Young Caring is based in",
-          titleHighlight: "Abomey-Calavi",
+          titleHighlight: "Littoral - Commune de Cotonou",
           description:
             "Our organisation works alongside children, families and communities. Please contact us before travelling if you would like to arrange a meeting.",
           country: "Country",

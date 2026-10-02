@@ -434,7 +434,7 @@ export default function Footer() {
               </a>
 
               <a
-                href="https://www.google.com/maps/search/?api=1&query=Abomey-Calavi%2C%20B%C3%A9nin"
+                href="https://www.google.com/maps/search/?api=1&query=cotonou%2C%20B%C3%A9nin"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={[
@@ -476,7 +476,7 @@ export default function Footer() {
                   </span>
 
                   <span className="mt-0.5 block font-semibold">
-                    Abomey-Calavi, Bénin
+                    Littoral - Commune de Cotonou, Bénin  Quartier :: Agla Maison : AGBOGNONNON Cyrille
                   </span>
                 </span>
               </a>

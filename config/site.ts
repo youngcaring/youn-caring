@@ -52,7 +52,7 @@ const whatsappNumber = "2290157774673";
 
 const emailAddress = "contact@young-caring.org";
 
-const physicalAddress = "Abomey-Calavi, Bénin";
+const physicalAddress = "Littoral - Commune de Cotonou, Bénin";
 
 /* =========================================================
    RÉSEAUX SOCIAUX
@@ -197,12 +197,12 @@ export const siteConfig = {
 
     address: {
       display: physicalAddress,
-      city: "Abomey-Calavi",
+      city: "Littoral - Commune de Cotonou",
       country: "Bénin",
       countryCode: "BJ",
 
       mapUrl:
-        "https://www.google.com/maps/search/?api=1&query=Abomey-Calavi%2C%20B%C3%A9nin",
+        "https://www.google.com/maps/search/?api=1&query=cotonou%2C%20B%C3%A9nin",
     },
   },
 

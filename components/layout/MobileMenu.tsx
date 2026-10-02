@@ -228,7 +228,7 @@ export default function MobileMenu({
                 className="shrink-0 text-[#0097a7]"
               />
 
-              <span>Abomey-Calavi, Bénin</span>
+              <span>Littoral - Commune de Cotonou, Bénin</span>
             </div>
           </div>
         </div>

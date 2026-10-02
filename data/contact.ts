@@ -33,7 +33,7 @@ export const contactInformation = {
     "contact@young-caring.org",
 
   address:
-    "Abomey-Calavi, Bénin",
+    "Cotonou, Bénin Quartier :: Agla Maison : AGBOGNONNON Cyrille",
 
   country:
     "Bénin",
@@ -55,7 +55,7 @@ export const contactLinks = {
     `mailto:${contactInformation.email}`,
 
   address:
-    "https://www.google.com/maps/search/?api=1&query=Abomey-Calavi%2C%20B%C3%A9nin",
+    "https://www.google.com/maps/search/?api=1&query=cotonou%2C%20B%C3%A9nin",
 } as const;
 
 /*
