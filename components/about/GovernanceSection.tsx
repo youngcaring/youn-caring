@@ -23,7 +23,6 @@ type GovernanceMember = {
     fr: string;
     en: string;
   };
-  imagePosition?: string;
 };
 
 const GOVERNANCE_MEMBERS: GovernanceMember[] = [
@@ -41,7 +40,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Présidente",
       en: "President",
     },
-    imagePosition: "50% 20%",
   },
 
   {
@@ -55,7 +53,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Trésorière",
       en: "Treasurer",
     },
-    imagePosition: "50% 30%",
   },
 
   {
@@ -68,7 +65,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Secrétaire",
       en: "Secretary",
     },
-    imagePosition: "50% 12%",
   },
 
   // =========================================================
@@ -85,7 +81,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Président",
       en: "President",
     },
-    imagePosition: "50% 18%",
   },
 
   {
@@ -98,7 +93,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Chargée de communication et relations extérieures",
       en: "Communications and External Relations Officer",
     },
-    imagePosition: "50% 20%",
   },
 
   {
@@ -111,7 +105,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Secrétaire Général",
       en: "Secretary General",
     },
-    imagePosition: "50% 18%",
   },
 
   {
@@ -124,7 +117,6 @@ const GOVERNANCE_MEMBERS: GovernanceMember[] = [
       fr: "Trésorier Général",
       en: "General Treasurer",
     },
-    imagePosition: "50% 18%",
   },
 ];
 
@@ -146,7 +138,6 @@ export default function GovernanceSection() {
     currentLanguage === "fr"
       ? {
           label: "Gouvernance",
-
           titleStart: "Nos",
           titleHighlight: "représentants",
 
@@ -168,7 +159,6 @@ export default function GovernanceSection() {
         }
       : {
           label: "Governance",
-
           titleStart: "Our",
           titleHighlight: "representatives",
 
@@ -239,7 +229,7 @@ export default function GovernanceSection() {
             location={texts.franceLocation}
           />
 
-          <div className="mx-auto mt-8 grid max-w-[1050px] grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto mt-8 grid max-w-[1080px] grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3">
             {franceMembers.map((member) => (
               <MemberCard
                 key={member.id}
@@ -270,7 +260,7 @@ export default function GovernanceSection() {
             location={texts.beninLocation}
           />
 
-          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-8 grid grid-cols-1 gap-7 sm:grid-cols-2 xl:grid-cols-4">
             {beninMembers.map((member) => (
               <MemberCard
                 key={member.id}
@@ -353,43 +343,41 @@ function MemberCard({
   officialMember,
 }: MemberCardProps) {
   return (
-    <article className="group flex h-full min-h-[560px] flex-col overflow-hidden rounded-[28px] border border-[#e1e9ea] bg-white shadow-[0_14px_38px_rgba(7,31,33,0.055)] transition-all duration-300 hover:-translate-y-1 hover:border-[#d3e1e2] hover:shadow-[0_22px_55px_rgba(7,31,33,0.10)]">
-      {/* PHOTO */}
+    <article className="group flex h-full flex-col overflow-hidden rounded-[28px] border border-[#e1e9ea] bg-white shadow-[0_14px_38px_rgba(7,31,33,0.055)] transition-all duration-300 hover:-translate-y-1 hover:border-[#d3e1e2] hover:shadow-[0_22px_55px_rgba(7,31,33,0.10)]">
+      {/* =====================================================
+          PHOTO COMPLÈTE
+          object-contain = aucun recadrage
+      ===================================================== */}
 
-      <div className="relative h-[355px] w-full overflow-hidden bg-[#eef3f3] sm:h-[375px]">
-        <Image
-          src={member.image}
-          alt={`${member.fullName} - ${member.role[language]}`}
-          fill
-          sizes="
-            (max-width: 640px) 100vw,
-            (max-width: 1024px) 50vw,
-            25vw
-          "
-          className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
-          style={{
-            objectPosition:
-              member.imagePosition ?? "50% 20%",
-          }}
-        />
-
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/10 via-black/[0.03] to-transparent"
-        />
+      <div className="relative flex min-h-[360px] w-full items-center justify-center overflow-hidden bg-[#f5f7f7] p-3 sm:min-h-[390px]">
+        <div className="relative h-[340px] w-full sm:h-[370px]">
+          <Image
+            src={member.image}
+            alt={`${member.fullName} - ${member.role[language]}`}
+            fill
+            sizes="
+              (max-width: 640px) 100vw,
+              (max-width: 1024px) 50vw,
+              25vw
+            "
+            className="object-contain"
+          />
+        </div>
       </div>
 
-      {/* INFORMATIONS */}
+      {/* =====================================================
+          INFORMATIONS
+      ===================================================== */}
 
       <div className="flex flex-1 flex-col px-5 pb-5 pt-5 text-center sm:px-6">
         <div className="flex min-h-[52px] items-start justify-center">
-          <p className="max-w-[280px] text-[12px] font-black uppercase leading-[1.45] tracking-[0.075em] text-[#007d88]">
+          <p className="max-w-[290px] text-[12px] font-black uppercase leading-[1.45] tracking-[0.075em] text-[#007d88]">
             {member.role[language]}
           </p>
         </div>
 
         <div className="mt-2 flex min-h-[62px] items-start justify-center">
-          <h4 className="max-w-[310px] text-[17px] font-black leading-[1.28] tracking-[-0.02em] text-[#101719]">
+          <h4 className="max-w-[320px] text-[17px] font-black leading-[1.28] tracking-[-0.02em] text-[#101719]">
             {member.fullName}
           </h4>
         </div>
