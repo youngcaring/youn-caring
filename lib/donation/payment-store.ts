@@ -483,18 +483,18 @@ async function createPayment(
   );
 
   const donorFirstName =
-    normalizeRequiredString(
+    normalizeOptionalString(
       input.donorFirstName,
       "donorFirstName",
       MAX_NAME_LENGTH
-    );
+    ) ?? "";
 
   const donorLastName =
-    normalizeRequiredString(
+    normalizeOptionalString(
       input.donorLastName,
       "donorLastName",
       MAX_NAME_LENGTH
-    );
+    ) ?? "";
 
   const donorEmail =
     normalizeEmail(

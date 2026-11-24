@@ -23,9 +23,9 @@ export default function NewsHero() {
       aria-labelledby="news-hero-title"
       className={[
         "relative isolate overflow-hidden",
-        "min-h-[500px] bg-[#091719]",
+        "min-h-[400px] bg-[#091719]",
         "text-white",
-        "md:min-h-[460px]",
+        "md:min-h-[400px]",
       ].join(" ")}
     >
       {/* Image pour ordinateur */}
@@ -72,9 +72,9 @@ export default function NewsHero() {
       <div
         className={[
           "site-container relative z-10",
-          "flex min-h-[500px] items-end",
-          "pb-12 pt-28",
-          "md:min-h-[460px]",
+          "flex min-h-[400px] items-end",
+          "pb-10 pt-20",
+          "md:min-h-[400px]",
           "md:items-center md:py-16",
         ].join(" ")}
       >

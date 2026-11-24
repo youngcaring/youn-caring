@@ -23,9 +23,9 @@ export default function HeroSection() {
       aria-labelledby="hero-title"
       className={[
         "relative isolate overflow-hidden",
-        "min-h-[700px] bg-[#091719] text-white",
-        "md:min-h-[620px]",
-        "lg:min-h-[650px]",
+        "min-h-[440px] bg-[#091719] text-white",
+        "md:min-h-[400px]",
+        "lg:min-h-[420px]",
       ].join(" ")}
     >
       {/* Image pour ordinateur */}
@@ -86,9 +86,9 @@ export default function HeroSection() {
       <div
         className={[
           "site-container relative z-10 flex",
-          "min-h-[700px] items-end pb-20 pt-24",
-          "md:min-h-[620px] md:items-center md:py-20",
-          "lg:min-h-[650px]",
+          "min-h-[440px] items-end pb-10 pt-20",
+          "md:min-h-[400px] md:items-center md:py-16",
+          "lg:min-h-[420px]",
         ].join(" ")}
       >
         <div className="animate-fade-up w-full max-w-[680px]">

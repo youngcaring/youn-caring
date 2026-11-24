@@ -843,8 +843,8 @@ function createCustomerPayload(
 
   const customer: UnknownRecord = {
     email: donor.email,
-    first_name: donor.firstName,
-    last_name: donor.lastName,
+    first_name: donor.firstName || "Donateur",
+    last_name: donor.lastName || "Anonyme",
   };
 
   if (donor.phone) {

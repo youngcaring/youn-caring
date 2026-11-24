@@ -39,7 +39,7 @@ export default function ContactCallToAction() {
         };
 
   return (
-    <section className="bg-white px-4 py-10 sm:px-0 sm:py-14">
+    <section className="bg-white px-4 py-6 sm:px-0 sm:py-8">
       <div className="site-container">
         <div className="relative isolate overflow-hidden rounded-[30px] bg-[#091719] px-6 py-10 text-white shadow-[0_22px_55px_rgba(7,31,33,0.16)] sm:px-9 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:px-12 lg:py-12">
           <div

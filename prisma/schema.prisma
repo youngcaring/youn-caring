@@ -499,3 +499,76 @@ model DonationReceipt {
   @@index([emailSentAt])
   @@map("donation_receipts")
 }
+
+/**
+ * ============================================================================
+ * MOYENS DE PAIEMENT PUBLICS
+ * ============================================================================
+ * Informations administrables affichées
+ * sur la page d'accueil publique.
+ */
+model PaymentMethod {
+  id String @id @default(cuid())
+
+  // Nom : MTN Money, Moov Money, Celtiis Cash, Banque...
+  name String @db.VarChar(150)
+
+  // Numéro Mobile Money ou coordonnées bancaires publiques.
+  accountNumber String @db.VarChar(255)
+
+  // Nom du titulaire du compte.
+  accountHolder String? @db.VarChar(200)
+
+  // Logo du moyen de paiement.
+  logoUrl String? @db.VarChar(1000)
+
+  // Informations complémentaires.
+  descriptionFr String? @db.Text
+  descriptionEn String? @db.Text
+
+  // Visibilité sur la page publique.
+  isActive Boolean @default(true)
+
+  // Ordre d'affichage.
+  displayOrder Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([isActive, displayOrder])
+  @@map("payment_methods")
+}
+
+/**
+ * ============================================================================
+ * ACTUALITÉS YOUNG CARING
+ * ============================================================================
+ * Publications administrables affichées
+ * sur la page d'accueil publique.
+ */
+model NewsPost {
+  id String @id @default(cuid())
+
+  // Titre de la publication.
+  titleFr String @db.VarChar(250)
+  titleEn String? @db.VarChar(250)
+
+  // Description de la publication.
+  descriptionFr String @db.Text
+  descriptionEn String? @db.Text
+
+  // Liste des URL des images : 1 à 3 images.
+  images String[] @default([])
+
+  // Visibilité de la publication.
+  isPublished Boolean @default(false)
+
+  // Date de publication.
+  publishedAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([isPublished, publishedAt])
+  @@map("news_posts")
+}

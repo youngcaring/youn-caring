@@ -35,7 +35,7 @@ export default function GalleryHero() {
   return (
     <section
       aria-labelledby="gallery-hero-title"
-      className="relative isolate min-h-[480px] overflow-hidden bg-[#091719] text-white md:min-h-[540px]"
+      className="relative isolate min-h-[390px] overflow-hidden bg-[#091719] text-white md:min-h-[440px]"
     >
       <Image
         src={galleryImages.heroDesktop}
@@ -60,7 +60,7 @@ export default function GalleryHero() {
         className="absolute inset-0 -z-0 bg-[linear-gradient(90deg,rgba(4,19,21,0.96)_0%,rgba(4,19,21,0.76)_55%,rgba(4,19,21,0.28)_100%)]"
       />
 
-      <div className="site-container relative z-10 flex min-h-[480px] items-end pb-14 pt-28 md:min-h-[540px] md:items-center md:py-20">
+      <div className="site-container relative z-10 flex min-h-[390px] items-end pb-10 pt-20 md:min-h-[440px] md:items-center md:py-16">
         <div className="max-w-3xl">
           <p className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.1em] text-[#f36c16]">
             <Images

@@ -223,8 +223,8 @@ function ActionDetailsContent({
       <header
         className={[
           "relative isolate overflow-hidden",
-          "min-h-[500px] bg-[#091719]",
-          "text-white md:min-h-[560px]",
+          "min-h-[400px] bg-[#091719]",
+          "text-white md:min-h-[400px]",
         ].join(" ")}
       >
         <Image
@@ -248,10 +248,10 @@ function ActionDetailsContent({
         <div
           className={[
             "site-container relative z-10",
-            "flex min-h-[500px] items-end",
-            "pb-12 pt-28",
-            "md:min-h-[560px] md:items-center",
-            "md:py-20",
+            "flex min-h-[400px] items-end",
+            "pb-10 pt-20",
+            "md:min-h-[400px] md:items-center",
+            "md:py-16",
           ].join(" ")}
         >
           <div className="max-w-3xl">

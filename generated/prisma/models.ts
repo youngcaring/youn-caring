@@ -11,4 +11,6 @@
 export type * from './models/DonationPayment'
 export type * from './models/DonationWebhookEvent'
 export type * from './models/DonationReceipt'
+export type * from './models/PaymentMethod'
+export type * from './models/NewsPost'
 export type * from './commonInputTypes'

@@ -13,6 +13,8 @@ import {
   ExternalLink,
   HeartHandshake,
   LogOut,
+  Newspaper,
+  Wallet,
   RefreshCw,
   ShieldCheck,
   TriangleAlert,
@@ -1292,6 +1294,17 @@ export default async function AdminDashboardPage() {
             </Link>
           </div>
         </section>
+
+        <nav aria-label="Gestion du contenu" className="mt-7 grid gap-3 sm:grid-cols-2">
+          <Link href="/admin/news" className="flex items-center gap-4 rounded-2xl border border-[var(--yc-border)] bg-white p-5 shadow-sm transition hover:border-[var(--yc-turquoise)] hover:shadow-md">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--yc-turquoise-light)] text-[var(--yc-turquoise-deep)]"><Newspaper aria-hidden="true" className="h-6 w-6" /></span>
+            <span><span className="block font-bold">Gérer les actualités</span><span className="mt-1 block text-sm text-[var(--yc-text-muted)]">Publier et supprimer les actualités.</span></span>
+          </Link>
+          <Link href="/admin/payment-methods" className="flex items-center gap-4 rounded-2xl border border-[var(--yc-border)] bg-white p-5 shadow-sm transition hover:border-[var(--yc-turquoise)] hover:shadow-md">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--yc-turquoise-light)] text-[var(--yc-turquoise-deep)]"><Wallet aria-hidden="true" className="h-6 w-6" /></span>
+            <span><span className="block font-bold">Gérer les moyens de paiement</span><span className="mt-1 block text-sm text-[var(--yc-text-muted)]">Ajouter, modifier ou supprimer les moyens de paiement.</span></span>
+          </Link>
+        </nav>
 
         {/*
          * ==============================================================

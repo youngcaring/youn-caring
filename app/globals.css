@@ -229,7 +229,11 @@ select:focus-visible {
 
 .site-section {
   position: relative;
-  padding-block: 96px;
+  padding-block: 56px;
+}
+
+.home-page .site-section {
+  padding-block: clamp(30px, 4vw, 44px);
 }
 
 .section-label {
@@ -458,7 +462,7 @@ select:focus-visible {
   }
 
   .site-section {
-    padding-block: 76px;
+    padding-block: 48px;
   }
 }
 
@@ -549,7 +553,7 @@ select:focus-visible {
   }
 
   .site-section {
-    padding-block: 64px;
+    padding-block: 40px;
   }
 
   .section-title {
@@ -577,7 +581,7 @@ select:focus-visible {
   }
 
   .site-section {
-    padding-block: 54px;
+    padding-block: 32px;
   }
 
   .section-label {

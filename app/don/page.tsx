@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
-import DonationCallToAction from "@/components/donation/DonationCallToAction";
-import DonationFaq from "@/components/donation/DonationFaq";
 import DonationForm from "@/components/donation/DonationForm";
-import DonationHero from "@/components/donation/DonationHero";
-import DonationSecuritySection from "@/components/donation/DonationSecuritySection";
+import PaymentMethodsSection from "@/components/home/PaymentMethodsSection";
+import { db } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Faire un don",
@@ -55,18 +55,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function DonationPage() {
+export default async function DonationPage() {
+  const methods = await db.paymentMethod.findMany({ where: { isActive: true }, orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }], select: { id: true, name: true, accountNumber: true, accountHolder: true, logoUrl: true, descriptionFr: true, descriptionEn: true, displayOrder: true } });
   return (
     <>
-      <DonationHero />
 
       <DonationForm />
-
-      <DonationSecuritySection />
-
-      <DonationFaq />
-
-      <DonationCallToAction />
+      <PaymentMethodsSection methods={methods} />
     </>
   );
 }

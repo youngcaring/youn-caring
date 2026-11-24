@@ -64,3 +64,23 @@ export type DonationWebhookEvent = Prisma.DonationWebhookEventModel
  *  * - son statut d’envoi par e-mail.
  */
 export type DonationReceipt = Prisma.DonationReceiptModel
+/**
+ * Model PaymentMethod
+ * *
+ *  * ============================================================================
+ *  * MOYENS DE PAIEMENT PUBLICS
+ *  * ============================================================================
+ *  * Informations administrables affichées
+ *  * sur la page d'accueil publique.
+ */
+export type PaymentMethod = Prisma.PaymentMethodModel
+/**
+ * Model NewsPost
+ * *
+ *  * ============================================================================
+ *  * ACTUALITÉS YOUNG CARING
+ *  * ============================================================================
+ *  * Publications administrables affichées
+ *  * sur la page d'accueil publique.
+ */
+export type NewsPost = Prisma.NewsPostModel

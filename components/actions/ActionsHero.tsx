@@ -16,8 +16,8 @@ export default function ActionsHero() {
       aria-labelledby="actions-hero-title"
       className={[
         "relative isolate overflow-hidden",
-        "min-h-[520px] bg-[#091719] text-white",
-        "md:min-h-[430px]",
+        "min-h-[420px] bg-[#091719] text-white",
+        "md:min-h-[390px]",
       ].join(" ")}
     >
       <Image
@@ -52,9 +52,9 @@ export default function ActionsHero() {
       <div
         className={[
           "site-container relative z-10",
-          "flex min-h-[520px] items-end",
-          "pb-12 pt-24",
-          "md:min-h-[430px] md:items-center md:py-16",
+          "flex min-h-[420px] items-end",
+          "pb-10 pt-20",
+          "md:min-h-[390px] md:items-center md:py-16",
         ].join(" ")}
       >
         <div className="max-w-[680px] animate-fade-up">

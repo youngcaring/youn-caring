@@ -53,7 +53,9 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   DonationPayment: 'DonationPayment',
   DonationWebhookEvent: 'DonationWebhookEvent',
-  DonationReceipt: 'DonationReceipt'
+  DonationReceipt: 'DonationReceipt',
+  PaymentMethod: 'PaymentMethod',
+  NewsPost: 'NewsPost'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -144,6 +146,39 @@ export const DonationReceiptScalarFieldEnum = {
 } as const
 
 export type DonationReceiptScalarFieldEnum = (typeof DonationReceiptScalarFieldEnum)[keyof typeof DonationReceiptScalarFieldEnum]
+
+
+export const PaymentMethodScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  accountNumber: 'accountNumber',
+  accountHolder: 'accountHolder',
+  logoUrl: 'logoUrl',
+  descriptionFr: 'descriptionFr',
+  descriptionEn: 'descriptionEn',
+  isActive: 'isActive',
+  displayOrder: 'displayOrder',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentMethodScalarFieldEnum = (typeof PaymentMethodScalarFieldEnum)[keyof typeof PaymentMethodScalarFieldEnum]
+
+
+export const NewsPostScalarFieldEnum = {
+  id: 'id',
+  titleFr: 'titleFr',
+  titleEn: 'titleEn',
+  descriptionFr: 'descriptionFr',
+  descriptionEn: 'descriptionEn',
+  images: 'images',
+  isPublished: 'isPublished',
+  publishedAt: 'publishedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NewsPostScalarFieldEnum = (typeof NewsPostScalarFieldEnum)[keyof typeof NewsPostScalarFieldEnum]
 
 
 export const SortOrder = {

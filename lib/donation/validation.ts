@@ -329,7 +329,7 @@ export function validateDonationCheckout(
    * Validation du prénom.
    */
   if (
-    !isValidTextLength(
+    firstName.length > 0 && !isValidTextLength(
       firstName,
       2,
       MAX_FIRST_NAME_LENGTH
@@ -345,7 +345,7 @@ export function validateDonationCheckout(
    * Validation du nom.
    */
   if (
-    !isValidTextLength(
+    lastName.length > 0 && !isValidTextLength(
       lastName,
       2,
       MAX_LAST_NAME_LENGTH
@@ -373,7 +373,7 @@ export function validateDonationCheckout(
    * Validation du téléphone optionnel.
    */
   if (
-    !isValidOptionalPhone(
+    phone.length === 0 || !isValidOptionalPhone(
       phone
     )
   ) {

@@ -92,10 +92,10 @@ export default function TransparencyHero() {
         className={[
           "site-container",
           "relative z-10",
-          "flex min-h-[520px]",
-          "items-end pb-14 pt-28",
-          "md:min-h-[600px]",
-          "md:items-center md:py-24",
+          "flex min-h-[420px]",
+          "items-end pb-10 pt-20",
+          "md:min-h-[400px]",
+          "md:items-center md:py-16",
         ].join(" ")}
       >
         <div className="max-w-3xl">

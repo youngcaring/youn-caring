@@ -197,7 +197,7 @@ export default async function NewsDetailsPage({
 
           {/* Hero */}
 
-          <header className="relative isolate min-h-[500px] overflow-hidden bg-[#091719] text-white md:min-h-[560px]">
+          <header className="relative isolate min-h-[400px] overflow-hidden bg-[#091719] text-white md:min-h-[400px]">
             <Image
               src={item.image}
               alt={item.imageAltFr}
@@ -212,7 +212,7 @@ export default async function NewsDetailsPage({
               className="absolute inset-0 -z-0 bg-[linear-gradient(90deg,rgba(4,19,21,0.95)_0%,rgba(4,19,21,0.73)_55%,rgba(4,19,21,0.30)_100%)]"
             />
 
-            <div className="site-container relative z-10 flex min-h-[500px] items-end pb-12 pt-28 md:min-h-[560px] md:items-center md:py-20">
+            <div className="site-container relative z-10 flex min-h-[400px] items-end pb-10 pt-20 md:min-h-[400px] md:items-center md:py-16">
               <div className="max-w-3xl">
                 <Link
                   href={siteConfig.navigation.news}

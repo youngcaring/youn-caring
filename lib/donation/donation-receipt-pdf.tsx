@@ -514,21 +514,21 @@ function normalizeReceiptInput(
   }
 
   const firstName =
-    normalizeRequiredText(
+    normalizeOptionalText(
       input.donor.firstName,
       "donor.firstName",
       MAX_DONOR_NAME_LENGTH
     );
 
   const lastName =
-    normalizeRequiredText(
+    normalizeOptionalText(
       input.donor.lastName,
       "donor.lastName",
       MAX_DONOR_NAME_LENGTH
     );
 
   const donorName =
-    `${firstName} ${lastName}`;
+    [firstName, lastName].filter(Boolean).join(" ") || (input.language === "en" ? "Donor" : "Donateur");
 
   const language =
     input.language === "en"

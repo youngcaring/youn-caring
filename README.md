@@ -1,5 +1,11 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Stockage des images des actualités
+
+Configurez `SUPABASE_URL` et `SUPABASE_SECRET_KEY` (ou `SUPABASE_SERVICE_ROLE_KEY`) dans l'environnement du serveur. Dans Supabase Storage, créez un bucket **public** nommé `news-images`. Les images des actualités publiées seront accessibles publiquement ; ne placez pas de fichiers confidentiels dans ce bucket. La clé secrète doit rester côté serveur et ne doit jamais utiliser le préfixe `NEXT_PUBLIC_`.
+
+Le formulaire accepte de une à trois images JPEG, PNG ou WebP de 3 Mo maximum chacune. Elles sont converties en WebP avant leur enregistrement. Redémarrez le serveur après toute modification des variables d'environnement ou de `next.config.ts`. Vérifiez également les limites de taille de requête de votre hébergeur ou de votre proxy.
+
 ## Getting Started
 
 First, run the development server:

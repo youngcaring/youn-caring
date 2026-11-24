@@ -41,9 +41,9 @@ export default function AboutCallToAction() {
         };
 
   return (
-    <section className="bg-[#f7f9f9] px-4 py-10 sm:px-0 sm:py-14">
+    <section className="bg-[#f7f9f9] px-4 py-6 sm:px-0 sm:py-8">
       <div className="site-container">
-        <div className="relative isolate overflow-hidden rounded-[32px] bg-[#091719] px-6 py-12 text-white shadow-[0_22px_55px_rgba(7,31,33,0.16)] sm:px-10 lg:px-14 lg:py-16">
+        <div className="relative isolate overflow-hidden rounded-[32px] bg-[#091719] px-6 py-8 text-white shadow-[0_22px_55px_rgba(7,31,33,0.16)] sm:px-10 lg:px-14 lg:py-10">
           <Image
             src={aboutImages.community}
             alt={texts.imageAlt}
